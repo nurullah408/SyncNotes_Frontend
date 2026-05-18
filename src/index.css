@@ -205,7 +205,7 @@ html:active-view-transition-type(slide-right) {
   background-size: 30px 30px;
 }
 
-path {
+.animated-helix-path {
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
   animation: draw 2s ease-out forwards;

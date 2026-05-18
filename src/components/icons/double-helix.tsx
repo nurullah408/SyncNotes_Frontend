@@ -152,6 +152,7 @@ export function DoubleHelix() {
           ))}
         </g>
         <path
+          className="animated-helix-path"
           ref={leftRef}
           d={initialLeftStrandPath}
           fill="none"
@@ -160,6 +161,7 @@ export function DoubleHelix() {
           strokeLinecap="round"
         />
         <path
+          className="animated-helix-path"
           ref={rightRef}
           d={initialRightStrandPath}
           fill="none"

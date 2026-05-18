@@ -1,21 +1,21 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/db/syncNotesDb";
-import { Fragment } from "react/jsx-runtime";
+import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Button } from "@/components/ui/button";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { db } from "@/db/syncNotesDb";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { useLiveQuery } from "dexie-react-hooks";
+import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "./-components/AppSidebar";
 
-export const Route = createFileRoute("/_auth/notes/notes")({
-  component: Notes,
+export const Route = createFileRoute("/_auth/notes")({
+  component: Index,
 });
 
-function Notes() {
+function Index() {
   const notes = useLiveQuery(() => db.notes.toArray());
 
   if (!notes) {
@@ -53,9 +53,11 @@ function Notes() {
     <Fragment>
       <SidebarProvider>
         <AppSidebar notes={notes} />
-        <div className="flex h-full items-start justify-start p-6">
-          <Outlet />
-        </div>
+        <SidebarInset className="">
+          <div className="w-full h-screen">
+            <Outlet />
+          </div>
+        </SidebarInset>
       </SidebarProvider>
     </Fragment>
   );
