@@ -3,4 +3,5 @@ export interface Note {
   title: string;
   content: string;
   lastUpdated: string;
+  isDeleted?: boolean;
 }
