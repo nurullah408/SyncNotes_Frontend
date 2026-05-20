@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { animate, spring } from "animejs";
+import { animate } from "animejs";
 import { generatePoints } from "@/lib/utils";
 import {
   AMPLITUDE,
@@ -152,6 +152,7 @@ export function DoubleHelix() {
           ))}
         </g>
         <path
+          className="animated-helix-path"
           ref={leftRef}
           d={initialLeftStrandPath}
           fill="none"
@@ -160,6 +161,7 @@ export function DoubleHelix() {
           strokeLinecap="round"
         />
         <path
+          className="animated-helix-path"
           ref={rightRef}
           d={initialRightStrandPath}
           fill="none"

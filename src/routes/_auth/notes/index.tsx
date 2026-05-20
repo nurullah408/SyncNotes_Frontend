@@ -1,17 +1,26 @@
 import { db } from "@/db/syncNotesDb";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Header } from "@/components/header";
-import { useLiveQuery } from "dexie-react-hooks";
-import { Notes } from "./-components/NotesList";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { FilePlus, LogOut, Plus, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
+import { Button } from "@/components/ui/button";
+import { EMPTY_CONTENT } from "@/lib/constants";
+import { useLiveQuery } from "dexie-react-hooks";
+import { Fragment } from "react/jsx-runtime";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "./-components/AppSidebar";
 
 export const Route = createFileRoute("/_auth/notes/")({
   component: Index,
@@ -21,9 +30,16 @@ function Index() {
   const queryClient = useQueryClient();
   const navigate = Route.useNavigate();
 
-  const notes = useLiveQuery(() =>
-    db.notes.orderBy("lastUpdated").reverse().toArray(),
-  );
+  async function createNewNote() {
+    const newNoteId = crypto.randomUUID();
+    await db.notes.add({
+      id: newNoteId,
+      title: "Untitled",
+      content: EMPTY_CONTENT,
+      lastUpdated: new Date().toISOString(),
+    });
+    navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
+  }
 
   async function handleLogout() {
     try {
@@ -40,25 +56,55 @@ function Index() {
   }
 
   return (
-    <div className="[view-transition-name:main-content] w-full h-full flex flex-col gap-2 p-4 overflow-hidden">
-      <Header className="justify-between">
-        <div className="">
-          <h4 className="text-sm font-bold text-primary">Sync Notes</h4>
+    <div className="[view-transition-name:main-content] w-full h-full flex flex-col overflow-hidden bg-background">
+      {/* Dynamic Header Toolbar Row */}
+      <Header className="justify-between border-b px-6 shrink-0 h-16 bg-white dark:bg-zinc-900">
+        <div>
+          <h4 className="text-sm font-bold text-muted-foreground">
+            Sync Notes
+          </h4>
         </div>
         <div>
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <User className="hover:cursor-pointer" />
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <User className="size-5 cursor-pointer" />
+              </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-10" align="end">
-              <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
-                <LogOut /> Log Out
+            <DropdownMenuContent className="w-40" align="end">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive cursor-pointer"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 size-4" /> Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </Header>
-      <Notes notes={notes} />
+
+      {/* Center Empty State Canvas Layout */}
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/30 dark:bg-zinc-950/20">
+        <div className="p-4 bg-white dark:bg-zinc-900 shadow-sm border rounded-2xl text-muted-foreground/60 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <FilePlus className="size-8" />
+        </div>
+
+        <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-zinc-50">
+          No Note Selected
+        </h3>
+        <p className="text-muted-foreground text-sm max-w-sm mt-1.5 mb-6 leading-relaxed">
+          Select a document card directly from the sidebar list parameters
+          navigation panel, or initialize a fresh editor canvas workspace right
+          now.
+        </p>
+
+        <Button
+          onClick={createNewNote}
+          className="gap-2 rounded-xl px-5 h-11 shadow-sm font-medium"
+        >
+          <Plus className="size-4" /> Create Fresh Note
+        </Button>
+      </div>
     </div>
   );
 }

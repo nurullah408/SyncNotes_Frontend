@@ -26,13 +26,33 @@ export const EDITOR_THEME = {
     "text-muted-foreground absolute top-4 left-4 pointer-events-none select-none",
   paragraph: "relative m-0 mb-2 last:mb-0",
   quote: "border-l-4 border-primary pl-4 italic text-muted-foreground my-4",
+  heading: {
+    h1: "text-4xl font-bold text-slate-900 tracking-tight mt-6 mb-2",
+    h2: "text-2xl font-bold text-slate-800 tracking-tight mt-5 mb-2",
+    h3: "text-xl font-bold text-slate-800 tracking-tight mt-4 mb-2",
+    h4: "text-base font-bold",
+    h5: "text-sm font-bold",
+    h6: "text-xs font-bold",
+  },
   list: {
     nested: {
-      listitem: "list-none",
+      listitem: "list-none pl-4",
     },
-    ol: "list-decimal ml-4 mb-2",
-    ul: "list-disc ml-4 mb-2",
-    listitem: "ml-4",
+    // 1. Move the specific list styles down, or keep them mutually exclusive
+    ol: "list-decimal pl-6 my-2 gap-1",
+    ul: "list-disc pl-6 my-2 gap-1",
+    listitem: "text-slate-800",
+
+    // 2. Add an explicit !important flag (via Tailwind's !) to force checklists to reset
+    // their dimensions, overriding the zombie 'ul' padding.
+    checklist: "!list-none !pl-2 p-0 m-0 my-2",
+
+    // 3. Keep your clean layout, but make sure left positioning coordinates match the pl-2 layout
+    listitemUnchecked:
+      "list-none relative pl-6 text-slate-800 select-none before:content-['☐'] before:text-slate-700 before:absolute before:left-0 before:top-0",
+
+    listitemChecked:
+      "list-none relative pl-6 line-through text-slate-400 select-none before:content-['✓'] before:text-black before:absolute before:left-0 before:top-0",
   },
   image: "max-w-full h-auto rounded-lg",
   link: "text-primary underline underline-offset-4 cursor-pointer hover:text-primary/80",
