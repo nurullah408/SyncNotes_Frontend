@@ -1,5 +1,5 @@
 import { db } from "@/db/syncNotesDb";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/header";
 import {
   DropdownMenu,
@@ -12,15 +12,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
 import { Button } from "@/components/ui/button";
 import { EMPTY_CONTENT } from "@/lib/constants";
-import { useLiveQuery } from "dexie-react-hooks";
-import { Fragment } from "react/jsx-runtime";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "./-components/AppSidebar";
 
 export const Route = createFileRoute("/_auth/notes/")({
   component: Index,
@@ -36,7 +27,7 @@ function Index() {
       id: newNoteId,
       title: "Untitled",
       content: EMPTY_CONTENT,
-      lastUpdated: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
   }

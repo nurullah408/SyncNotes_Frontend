@@ -1,5 +1,5 @@
 import { useLocalStorage } from "../../../../hooks/useLocalStorage";
-import { LOCAL_STORAGE_SYNC_KEY } from "@/lib/constants";
+import { INITIAL_EDITOR_STATE, LOCAL_STORAGE_SYNC_KEY } from "@/lib/constants";
 import { db } from "@/db/syncNotesDb";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,13 +21,27 @@ export function useGlobalSyncEngine() {
         .above(lastSyncedAt)
         .toArray();
 
-      const upstreamNotes = dirtyNotes.map((note) => ({
-        id: note.id,
-        title: note.title,
-        content: JSON.parse(note.content),
-        lastUpdated: note.lastUpdated,
-        isDeleted: !!note.isDeleted,
-      }));
+      const upstreamNotes = dirtyNotes.map((note) => {
+        let parsedContent: string;
+        try {
+          parsedContent =
+            typeof note.content === "string"
+              ? JSON.parse(note.content)
+              : note.content;
+        } catch {
+          parsedContent = INITIAL_EDITOR_STATE;
+        }
+        return {
+          id: note.id,
+          title:
+            note.title && note.title.trim() !== ""
+              ? note.title.trim()
+              : "Untitled",
+          content: parsedContent,
+          updatedAt: note.updatedAt,
+          isDeleted: !!note.isDeleted,
+        };
+      });
       await executePaginatedSync({
         notesToUpload: upstreamNotes,
         lastSyncedAt,
@@ -37,8 +51,9 @@ export function useGlobalSyncEngine() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes_list_query_key"] });
     },
-    onError: () => {
+    onError: (error) => {
       toast.error("Sync failed");
+      console.error(error);
     },
     retry: 3,
   });
@@ -87,7 +102,7 @@ export function useGlobalSyncEngine() {
           id: serverNote.id,
           title: serverNote.title,
           content: JSON.parse(serverNote.content),
-          lastUpdated: serverNote.lastUpdated,
+          updatedAt: serverNote.updatedAt,
           isDeleted: serverNote.isDeleted,
         }));
         await db.notes.bulkPut(downstreamNotes);
@@ -98,7 +113,7 @@ export function useGlobalSyncEngine() {
         if (hardDeleteTargets.length > 0) {
           await db.notes.bulkDelete(hardDeleteTargets);
         }
-        if (!data.hasMore) {
+        if (data.hasMore) {
           await executePaginatedSync({
             notesToUpload: [],
             lastSyncedAt,

@@ -1,16 +1,17 @@
 import { Editor } from "@/components/lexical-editor";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { db } from "@/db/syncNotesDb";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useLiveQuery } from "dexie-react-hooks";
 import { $getRoot, type EditorState } from "lexical";
 import { Check, LoaderPinwheel, Plus } from "lucide-react";
 import { useState, type ChangeEvent, type MouseEvent } from "react";
+import { useNoteActions } from "../-hooks/useNoteActions";
+import { useGlobalSyncEngine } from "../-hooks/useSyncEngine";
+import { useNoteDetail } from "../-hooks/useNoteDetail";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
@@ -19,18 +20,24 @@ export function Note() {
 
   const navigate = useNavigate();
 
+  const { sync } = useGlobalSyncEngine();
+
+  const { saveNote } = useNoteActions(sync);
+
   const [isSaving, setIsSaving] = useState(false);
 
-  const note = useLiveQuery(() => db.notes.get(params.noteId), [params.noteId]);
+  const noteData = useNoteDetail(params.noteId);
+
+  const note = noteData.data;
 
   async function onClickPlusButton(event: MouseEvent) {
     event.preventDefault();
     const newNoteId = crypto.randomUUID();
-    await db.notes.add({
+    await saveNote({
       id: newNoteId,
       title: "Untitled",
       content: INITIAL_EDITOR_STATE,
-      lastUpdated: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
     navigate({
       to: "/notes/$noteId",
@@ -41,13 +48,13 @@ export function Note() {
   }
 
   const updateNote = useDebouncedCallback(async (updates: Partial<Note>) => {
-    await db.notes.update(params.noteId, { ...updates });
+    await saveNote({ ...updates, id: params.noteId });
     setIsSaving(false);
   }, 500);
 
   function onChangeTitle(event: ChangeEvent<HTMLInputElement>) {
     const { value } = event.currentTarget;
-    updateNote({ title: value });
+    updateNote({ ...note, title: value });
     setIsSaving(true);
   }
 
@@ -60,16 +67,16 @@ export function Note() {
         : JSON.stringify(editorState.toJSON());
 
       updateNote({
+        ...note,
         content: json,
-        lastUpdated: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       setIsSaving(true);
     });
   }
 
-  const content = note?.content
-    ? JSON.parse(note.content)
-    : INITIAL_EDITOR_STATE;
+  const title = note ? note.title : "Untitled";
+  const content = note ? JSON.parse(note.content) : INITIAL_EDITOR_STATE;
 
   if (!note) {
     return (
@@ -124,13 +131,13 @@ export function Note() {
           className="text-3xl my-2 w-full border-none underline font-extrabold focus:outline-none"
           type="text"
           placeholder="Untitled"
-          defaultValue={note?.title}
+          defaultValue={title}
           onChange={onChangeTitle}
         />
         <h3 className="text-sm font-semibold text-gray-600">
           Last updated on{" "}
           <span className="italic">
-            {new Date(note?.lastUpdated || "").toLocaleString()}
+            {new Date(note?.updatedAt || "").toLocaleString()}
           </span>
         </h3>
         <div className="h-[80%] rounded-lg overflow-y-auto">

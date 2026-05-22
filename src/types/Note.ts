@@ -2,6 +2,6 @@ export interface Note {
   id: string;
   title: string;
   content: string;
-  lastUpdated: string;
+  updatedAt: string;
   isDeleted?: boolean;
 }
