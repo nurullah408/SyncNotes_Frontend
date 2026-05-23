@@ -5,10 +5,10 @@ import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, LoaderPinwheel, Plus } from "lucide-react";
-import { useState, type ChangeEvent, type MouseEvent } from "react";
+import { Check, Download, LoaderPinwheel } from "lucide-react";
+import { useState, type ChangeEvent } from "react";
 import { useNoteActions } from "../-hooks/useNoteActions";
 import { useGlobalSyncEngine } from "../-hooks/useSyncEngine";
 import { useNoteDetail } from "../-hooks/useNoteDetail";
@@ -18,9 +18,7 @@ export function Note() {
 
   const { open } = useSidebar();
 
-  const navigate = useNavigate();
-
-  const { sync } = useGlobalSyncEngine();
+  const { sync, isSyncing } = useGlobalSyncEngine();
 
   const { saveNote } = useNoteActions(sync);
 
@@ -29,23 +27,6 @@ export function Note() {
   const noteData = useNoteDetail(params.noteId);
 
   const note = noteData.data;
-
-  async function onClickPlusButton(event: MouseEvent) {
-    event.preventDefault();
-    const newNoteId = crypto.randomUUID();
-    await saveNote({
-      id: newNoteId,
-      title: "Untitled",
-      content: INITIAL_EDITOR_STATE,
-      updatedAt: new Date().toISOString(),
-    });
-    navigate({
-      to: "/notes/$noteId",
-      params: {
-        noteId: newNoteId,
-      },
-    });
-  }
 
   const updateNote = useDebouncedCallback(async (updates: Partial<Note>) => {
     await saveNote({ ...updates, id: params.noteId });
@@ -66,12 +47,13 @@ export function Note() {
         ? INITIAL_EDITOR_STATE
         : JSON.stringify(editorState.toJSON());
 
+      setIsSaving(true);
+
       updateNote({
         ...note,
         content: json,
         updatedAt: new Date().toISOString(),
       });
-      setIsSaving(true);
     });
   }
 
@@ -116,12 +98,12 @@ export function Note() {
               </>
             )}
           </div>
-          <Button
-            type="button"
-            className="rounded-lg"
-            onClick={onClickPlusButton}
-          >
-            <Plus />
+          <Button type="button" className="rounded-lg" onClick={() => sync()}>
+            {isSyncing ? (
+              <LoaderPinwheel className="text-gray-500 duration-400 animate-spin size-4" />
+            ) : (
+              <Download />
+            )}
           </Button>
         </div>
       </div>

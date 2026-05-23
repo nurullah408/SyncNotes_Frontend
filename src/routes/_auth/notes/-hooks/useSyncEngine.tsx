@@ -7,6 +7,7 @@ import type { Note } from "@/types/Note";
 import { BASE_URL } from "@/constants";
 import { apiClient } from "@/lib/api-client";
 import type { SyncNoteResponse } from "@/types/response/SyncNoteResponse";
+import { QUERY_KEYS } from "@/lib/query-keys";
 
 export function useGlobalSyncEngine() {
   const queryClient = useQueryClient();
@@ -49,7 +50,7 @@ export function useGlobalSyncEngine() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notes_list_query_key"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lists() });
     },
     onError: (error) => {
       toast.error("Sync failed");
@@ -101,7 +102,7 @@ export function useGlobalSyncEngine() {
         const downstreamNotes = data.changes.map((serverNote) => ({
           id: serverNote.id,
           title: serverNote.title,
-          content: JSON.parse(serverNote.content),
+          content: serverNote.content,
           updatedAt: serverNote.updatedAt,
           isDeleted: serverNote.isDeleted,
         }));
