@@ -1,4 +1,4 @@
-import { useLocalStorage } from "../../../../hooks/useLocalStorage";
+import { useLocalStorage } from "../../../../hooks/useLocalStorage.ts";
 import { INITIAL_EDITOR_STATE, LOCAL_STORAGE_SYNC_KEY } from "@/lib/constants";
 import { db } from "@/db/syncNotesDb";
 import { toast } from "sonner";

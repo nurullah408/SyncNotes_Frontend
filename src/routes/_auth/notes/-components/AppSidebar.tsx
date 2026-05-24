@@ -9,9 +9,9 @@ import {
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import type { Note } from "@/types/Note";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
-import { useNoteActions } from "../-hooks/useNoteActions";
-import { useGlobalSyncEngine } from "../-hooks/useSyncEngine";
+import { FileText, Plus } from "lucide-react";
+import { useNoteActions } from "../-hooks/useNoteActions.ts";
+import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
 
 interface AppSidebarProps {
   notes: Note[] | undefined;
@@ -54,8 +54,9 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
               return (
                 <SidebarMenuItem
                   key={note.id}
-                  className="w-full flex justify-center rounded-[10px] overflow-hidden"
+                  className="px-2 w-full flex justify-start rounded-[10px] overflow-hidden"
                 >
+                  <FileText className="h-full bg-primary text-white" />
                   <Link
                     className="w-full px-2 py-1 text-center [&.active]:bg-primary [&.active]:text-white"
                     to={`/notes/$noteId`}

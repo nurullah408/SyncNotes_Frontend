@@ -7,7 +7,6 @@ export function useNoteActions(triggerSync: () => void) {
   const queryClient = useQueryClient();
 
   const saveNote = async (note: Partial<Note>) => {
-    console.log("NOTE TO SAVE: ", note);
     await db.notes.put({
       ...note,
       updatedAt: new Date().toISOString(),
