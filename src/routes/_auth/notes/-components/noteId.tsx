@@ -20,14 +20,24 @@ import {
 } from "@/components/ui/popover";
 import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
 import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
+import { Label } from "@/components/ui/label.tsx";
+import { Input } from "@/components/ui/input.tsx";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
 
-  const [value, setValue] = useLocalStorage<NoteSettings>("note-settings", {
-    showSeconds: false,
-    hourFormat: "24",
-  });
+  const [noteSettings, setNoteSettings] = useLocalStorage<NoteSettings>(
+    "note-settings",
+    {
+      showSeconds: false,
+      hourFormat: "24",
+    },
+  );
+
+  function onChangeNoteSettings(event: ChangeEvent<HTMLInputElement>) {
+    const { name, value } = event.currentTarget;
+    setNoteSettings({ ...noteSettings, [name]: value });
+  }
 
   const { open } = useSidebar();
 
@@ -92,7 +102,10 @@ export function Note() {
             <SidebarTrigger />
           </Button>
         </div>
-        <Clock showSeconds={value.showSeconds} hourFormat={value.hourFormat} />
+        <Clock
+          showSeconds={noteSettings.showSeconds}
+          hourFormat={noteSettings.hourFormat}
+        />
         {/* Note header right side */}
         <div className="flex gap-1 items-center">
           <div className="flex items-center gap-1">
@@ -108,14 +121,15 @@ export function Note() {
           </div>
           <Popover>
             <PopoverTrigger>
-              <Button variant="outline" size={"icon-sm"} className="rounded-lg">
+              <Button variant="outline" size={"icon-xs"} className="rounded-lg">
                 <Cog className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="rounded-lg">
-              <div className="grid">
-                <p>Content</p>
-              </div>
+              <NoteSettings
+                noteSettings={noteSettings}
+                onChangeNoteSettings={onChangeNoteSettings}
+              />
             </PopoverContent>
           </Popover>
         </div>
@@ -143,6 +157,39 @@ export function Note() {
             onChange={onEditorChange}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteSettings({
+  noteSettings,
+  onChangeNoteSettings,
+}: {
+  noteSettings: NoteSettings;
+  onChangeNoteSettings: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between gap-1">
+        <Label>Show Seconds?</Label>
+        <Input
+          name="showSeconds"
+          className="size-4 accent-accent"
+          type="checkbox"
+          onChange={onChangeNoteSettings}
+          checked={noteSettings.showSeconds}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <Label>12 Hour Format?</Label>
+        <Input
+          name="hourFormat"
+          className="size-4 accent-accent"
+          type="checkbox"
+          onChange={onChangeNoteSettings}
+          checked={noteSettings.hourFormat === "12"}
+        />
       </div>
     </div>
   );
