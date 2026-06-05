@@ -7,14 +7,27 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, LoaderPinwheel } from "lucide-react";
+import { Check, Cog, LoaderPinwheel } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useNoteActions } from "../-hooks/useNoteActions.ts";
 import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
 import { useNoteDetail } from "../-hooks/useNoteDetail.ts";
+import Clock from "@/components/clock.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
+import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
+
+  const [value, setValue] = useLocalStorage<NoteSettings>("note-settings", {
+    showSeconds: false,
+    hourFormat: "24",
+  });
 
   const { open } = useSidebar();
 
@@ -79,6 +92,7 @@ export function Note() {
             <SidebarTrigger />
           </Button>
         </div>
+        <Clock showSeconds={value.showSeconds} hourFormat={value.hourFormat} />
         {/* Note header right side */}
         <div className="flex gap-1 items-center">
           <div className="flex items-center gap-1">
@@ -92,6 +106,18 @@ export function Note() {
               </>
             )}
           </div>
+          <Popover>
+            <PopoverTrigger>
+              <Button variant="outline" size={"icon-sm"} className="rounded-lg">
+                <Cog className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="rounded-lg">
+              <div className="grid">
+                <p>Content</p>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       <div className="relative flex flex-col gap-2 h-full overflow-hidden">
@@ -105,7 +131,7 @@ export function Note() {
         />
         <h3 className="text-sm font-semibold text-gray-600">
           Last updated on{" "}
-          <span className="italic">
+          <span className="italic text-sm">
             {new Date(note?.updatedAt || "").toLocaleString()}
           </span>
         </h3>

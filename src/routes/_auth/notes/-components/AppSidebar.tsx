@@ -38,7 +38,7 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex-row items-center justify-between font-bold text-primary">
+      <SidebarHeader className="flex-row h-16 items-center justify-between font-bold text-primary">
         Sync Notes
         <SidebarTrigger className="rounded-[10px]" />
       </SidebarHeader>
@@ -54,14 +54,15 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
               return (
                 <SidebarMenuItem
                   key={note.id}
-                  className="px-2 w-full flex justify-start rounded-[10px] overflow-hidden"
+                  className="w-full border rounded-[30px] overflow-hidden"
                 >
-                  <FileText className="h-full bg-primary text-white" />
                   <Link
-                    className="w-full px-2 py-1 text-center [&.active]:bg-primary [&.active]:text-white"
+                    className="w-full py-0.5 px-2 flex items-center gap-2 text-center rounded-[30px] [&.active]:bg-primary [&.active]:text-white"
                     to={`/notes/$noteId`}
                     params={{ noteId: note.id }}
                   >
+                    <FileText className="h-full size-4  [&.active]:text-white" />
+
                     {note.title}
                   </Link>
                 </SidebarMenuItem>
