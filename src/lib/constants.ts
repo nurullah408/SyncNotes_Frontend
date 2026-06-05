@@ -106,3 +106,5 @@ export const AMPLITUDE = 100;
 export const FREQUENCY = 0.09;
 export const STRAND_LENGTH = 80;
 export const PHASE_DIFF = Math.PI;
+
+export const LOCAL_STORAGE_SYNC_KEY = "last_synced_at";

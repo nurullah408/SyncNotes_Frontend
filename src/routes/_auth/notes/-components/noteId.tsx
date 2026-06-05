@@ -1,54 +1,51 @@
 import { Editor } from "@/components/lexical-editor";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { db } from "@/db/syncNotesDb";
-import { useDebouncedCallback } from "@/hooks/useDebounce";
+import { useDebouncedCallback } from "@/hooks/useDebounce.ts";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
-import { useNavigate, useParams } from "@tanstack/react-router";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, LoaderPinwheel, Plus } from "lucide-react";
-import { useState, type ChangeEvent, type MouseEvent } from "react";
+import { Check, Cog, LoaderPinwheel } from "lucide-react";
+import { type ChangeEvent } from "react";
+import { useNoteActions } from "../-hooks/useNoteActions.ts";
+import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
+import { useNoteDetail } from "../-hooks/useNoteDetail.ts";
+import Clock from "@/components/clock.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
+import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
 
+  const [value, setValue] = useLocalStorage<NoteSettings>("note-settings", {
+    showSeconds: false,
+    hourFormat: "24",
+  });
+
   const { open } = useSidebar();
 
-  const navigate = useNavigate();
+  const { sync, isSyncing } = useGlobalSyncEngine();
 
-  const [isSaving, setIsSaving] = useState(false);
+  const { saveNote } = useNoteActions(sync);
 
-  const note = useLiveQuery(() => db.notes.get(params.noteId), [params.noteId]);
+  const noteData = useNoteDetail(params.noteId);
 
-  async function onClickPlusButton(event: MouseEvent) {
-    event.preventDefault();
-    const newNoteId = crypto.randomUUID();
-    await db.notes.add({
-      id: newNoteId,
-      title: "Untitled",
-      content: INITIAL_EDITOR_STATE,
-      lastUpdated: new Date().toISOString(),
-    });
-    navigate({
-      to: "/notes/$noteId",
-      params: {
-        noteId: newNoteId,
-      },
-    });
-  }
+  const note = noteData.data;
 
   const updateNote = useDebouncedCallback(async (updates: Partial<Note>) => {
-    await db.notes.update(params.noteId, { ...updates });
-    setIsSaving(false);
+    await saveNote({ ...updates, id: params.noteId });
   }, 500);
 
   function onChangeTitle(event: ChangeEvent<HTMLInputElement>) {
     const { value } = event.currentTarget;
-    updateNote({ title: value });
-    setIsSaving(true);
+    updateNote({ ...note, title: value });
   }
 
   function onEditorChange(editorState: EditorState) {
@@ -60,16 +57,15 @@ export function Note() {
         : JSON.stringify(editorState.toJSON());
 
       updateNote({
+        ...note,
         content: json,
-        lastUpdated: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
-      setIsSaving(true);
     });
   }
 
-  const content = note?.content
-    ? JSON.parse(note.content)
-    : INITIAL_EDITOR_STATE;
+  const title = note ? note.title : "Untitled";
+  const content = note ? note.content : INITIAL_EDITOR_STATE;
 
   if (!note) {
     return (
@@ -96,10 +92,11 @@ export function Note() {
             <SidebarTrigger />
           </Button>
         </div>
+        <Clock showSeconds={value.showSeconds} hourFormat={value.hourFormat} />
         {/* Note header right side */}
         <div className="flex gap-1 items-center">
           <div className="flex items-center gap-1">
-            {isSaving ? (
+            {isSyncing ? (
               <>
                 <LoaderPinwheel className="text-gray-500 duration-400 animate-spin size-4" />
               </>
@@ -109,13 +106,18 @@ export function Note() {
               </>
             )}
           </div>
-          <Button
-            type="button"
-            className="rounded-lg"
-            onClick={onClickPlusButton}
-          >
-            <Plus />
-          </Button>
+          <Popover>
+            <PopoverTrigger>
+              <Button variant="outline" size={"icon-sm"} className="rounded-lg">
+                <Cog className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="rounded-lg">
+              <div className="grid">
+                <p>Content</p>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       <div className="relative flex flex-col gap-2 h-full overflow-hidden">
@@ -124,13 +126,13 @@ export function Note() {
           className="text-3xl my-2 w-full border-none underline font-extrabold focus:outline-none"
           type="text"
           placeholder="Untitled"
-          defaultValue={note?.title}
+          defaultValue={title}
           onChange={onChangeTitle}
         />
         <h3 className="text-sm font-semibold text-gray-600">
           Last updated on{" "}
-          <span className="italic">
-            {new Date(note?.lastUpdated || "").toLocaleString()}
+          <span className="italic text-sm">
+            {new Date(note?.updatedAt || "").toLocaleString()}
           </span>
         </h3>
         <div className="h-[80%] rounded-lg overflow-y-auto">

@@ -6,49 +6,68 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { db } from "@/db/syncNotesDb";
-import { EMPTY_CONTENT } from "@/lib/constants";
+import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import type { Note } from "@/types/Note";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
+import { useNoteActions } from "../-hooks/useNoteActions.ts";
+import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
 
-export function AppSidebar({ notes }: { notes: Note[] }) {
+interface AppSidebarProps {
+  notes: Note[] | undefined;
+  isLoading: boolean;
+}
+
+export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
   const navigate = useNavigate();
+
+  const { sync } = useGlobalSyncEngine();
+  const { saveNote } = useNoteActions(sync);
 
   async function createNewNote() {
     const newNoteId = crypto.randomUUID();
-    await db.notes.add({
+    await saveNote({
       id: newNoteId,
       title: "Untitled",
-      content: EMPTY_CONTENT,
-      lastUpdated: new Date().toISOString(),
+      content: INITIAL_EDITOR_STATE,
+      updatedAt: new Date().toISOString(),
+      isDeleted: false,
     });
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
   }
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex-row items-center justify-between font-bold text-primary">
+      <SidebarHeader className="flex-row h-16 items-center justify-between font-bold text-primary">
         Sync Notes
         <SidebarTrigger className="rounded-[10px]" />
       </SidebarHeader>
       <SidebarContent className="px-2 mt-2">
-        {notes.map((note: Note) => {
-          return (
-            <SidebarMenuItem
-              key={note.id}
-              className="w-full flex justify-center rounded-[10px] overflow-hidden"
-            >
-              <Link
-                className="w-full px-2 py-1 text-center [&.active]:bg-primary [&.active]:text-white"
-                to={`/notes/$noteId`}
-                params={{ noteId: note.id }}
-              >
-                {note.title}
-              </Link>
-            </SidebarMenuItem>
-          );
-        })}
+        {isLoading
+          ? Array.from({ length: 10 }).map((_, i) => (
+              <SidebarMenuItem
+                key={i}
+                className="w-full flex justify-center rounded-[10px] overflow-hidden duration-400 animate-pulse"
+              />
+            ))
+          : notes?.map((note: Note) => {
+              return (
+                <SidebarMenuItem
+                  key={note.id}
+                  className="w-full border rounded-[30px] overflow-hidden"
+                >
+                  <Link
+                    className="w-full py-0.5 px-2 flex items-center gap-2 text-center rounded-[30px] [&.active]:bg-primary [&.active]:text-white"
+                    to={`/notes/$noteId`}
+                    params={{ noteId: note.id }}
+                  >
+                    <FileText className="h-full size-4  [&.active]:text-white" />
+
+                    {note.title}
+                  </Link>
+                </SidebarMenuItem>
+              );
+            })}
         <SidebarMenuItem className="w-full flex justify-center rounded-[10px] overflow-hidden">
           <Button
             variant="ghost"

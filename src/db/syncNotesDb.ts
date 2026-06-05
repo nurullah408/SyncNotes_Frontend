@@ -7,7 +7,7 @@ export class SyncNotesDb extends Dexie {
   constructor() {
     super("SyncNotesDb");
     this.version(1).stores({
-      notes: "id, title, lastUpdated",
+      notes: "id, title, updatedAt, isDeleted",
     });
   }
 }
