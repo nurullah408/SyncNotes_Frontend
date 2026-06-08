@@ -18,7 +18,7 @@ import {
   INSERT_UNORDERED_LIST_COMMAND,
 } from "@lexical/list";
 // React Imports
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
 
 class SlashMenuOption extends MenuOption {
@@ -178,50 +178,103 @@ export function SlashMenuPlugin() {
         { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex },
       ) => {
         if (!anchorElementRef.current || options.length === 0) return null;
-        return ReactDOM.createPortal(
-          <div
-            className="bg-background text-sm shadow-lg max-w-45 min-w-45 p-1"
-            style={{
-              position: "absolute",
-              zIndex: 50,
-              padding: "calc(var(--spacing) * 1)",
-              overflow: "auto",
-              fontSize: "var(--text-sm)",
-              maxWidth: "calc(var(--spacing) * 45)",
-              maxHeight: "calc(var(--spacing) * 45",
-              backgroundColor: "var(--background-color)",
-              borderColor: "var(--accent)",
-              borderWidth: "2px",
-              borderRadius: "20px",
-              top:
-                anchorElementRef.current.getBoundingClientRect().top +
-                window.scrollY +
-                24,
-              left:
-                anchorElementRef.current.getBoundingClientRect().left +
-                window.scrollX,
-            }}
-          >
-            <ul>
-              {options.map((option, index) => {
-                const isSelected = selectedIndex === index;
-                return (
-                  <li
-                    key={option.key}
-                    ref={option.setRefElement}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    onClick={() => selectOptionAndCleanUp(option)}
-                    className={`cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
-                  >
-                    {option.title}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>,
-          document.body,
+        return (
+          <MenuPositioner
+            anchorElement={anchorElementRef.current}
+            selectedIndex={selectedIndex}
+            selectOptionAndCleanUp={selectOptionAndCleanUp}
+            setHighlightedIndex={setHighlightedIndex}
+            options={options}
+          />
         );
       }}
     />
+  );
+}
+
+function MenuPositioner({
+  anchorElement,
+  selectedIndex,
+  selectOptionAndCleanUp,
+  setHighlightedIndex,
+  options,
+}: {
+  anchorElement: HTMLElement;
+  selectedIndex: number | null;
+  selectOptionAndCleanUp: (option: SlashMenuOption) => void;
+  setHighlightedIndex: (index: number) => void;
+  options: SlashMenuOption[];
+}) {
+  const [coords, setCoords] = useState({ top: 0, left: 0, ready: false });
+  useLayoutEffect(() => {
+    if (!anchorElement) return;
+
+    const updatePlacement = () => {
+      const rect = anchorElement.getBoundingClientRect();
+
+      if (rect.top === 0 && rect.left === 0) {
+        return;
+      }
+
+      setCoords({
+        top: rect.top + window.scrollY + 10,
+        left: rect.left + window.scrollX,
+        ready: true,
+      });
+    };
+
+    updatePlacement();
+
+    const observer = new MutationObserver(updatePlacement);
+    observer.observe(anchorElement, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [anchorElement]);
+
+  return ReactDOM.createPortal(
+    <div
+      className="bg-background text-sm shadow-lg max-w-45 min-w-45 p-1"
+      style={{
+        position: "absolute",
+        zIndex: 50,
+        padding: "calc(var(--spacing) * 1)",
+        overflow: "auto",
+        fontSize: "var(--text-sm)",
+        maxWidth: "calc(var(--spacing) * 45)",
+        maxHeight: "calc(var(--spacing) * 45",
+        backgroundColor: "var(--background-color)",
+        borderColor: "var(--accent)",
+        borderWidth: "2px",
+        borderRadius: "20px",
+        top: coords.ready ? coords.top : 0,
+        left: coords.ready ? coords.left : 0,
+        opacity: coords.ready ? 1 : 0,
+        visibility: coords.ready ? "visible" : "hidden",
+      }}
+    >
+      <ul>
+        {options.map((option, index) => {
+          const isSelected = selectedIndex === index;
+          return (
+            <li
+              key={option.key}
+              ref={option.setRefElement}
+              onMouseEnter={() => setHighlightedIndex(index)}
+              onClick={() => selectOptionAndCleanUp(option)}
+              className={`cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
+            >
+              {option.title}
+            </li>
+          );
+        })}
+      </ul>
+    </div>,
+    document.body,
   );
 }
