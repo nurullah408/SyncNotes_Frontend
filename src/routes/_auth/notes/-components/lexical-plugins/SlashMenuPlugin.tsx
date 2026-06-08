@@ -180,8 +180,19 @@ export function SlashMenuPlugin() {
         if (!anchorElementRef.current || options.length === 0) return null;
         return ReactDOM.createPortal(
           <div
-            className="absolute z-50 bg-background rounded-lg shadow-lg max-w-75 min-w-45 p-1"
+            className="bg-background text-sm shadow-lg max-w-45 min-w-45 p-1"
             style={{
+              position: "absolute",
+              zIndex: 50,
+              padding: "calc(var(--spacing) * 1)",
+              overflow: "auto",
+              fontSize: "var(--text-sm)",
+              maxWidth: "calc(var(--spacing) * 45)",
+              maxHeight: "calc(var(--spacing) * 45",
+              backgroundColor: "var(--background-color)",
+              borderColor: "var(--accent)",
+              borderWidth: "2px",
+              borderRadius: "20px",
               top:
                 anchorElementRef.current.getBoundingClientRect().top +
                 window.scrollY +
@@ -200,7 +211,7 @@ export function SlashMenuPlugin() {
                     ref={option.setRefElement}
                     onMouseEnter={() => setHighlightedIndex(index)}
                     onClick={() => selectOptionAndCleanUp(option)}
-                    className={`cursor-pointer px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
+                    className={`cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
                   >
                     {option.title}
                   </li>
