@@ -224,12 +224,12 @@ function MenuPositioner({
     };
 
     updatePlacement();
-
+    // Observe changes to the anchor element to update the menu position
     const observer = new MutationObserver(updatePlacement);
     observer.observe(anchorElement, {
-      attributes: true,
-      childList: true,
-      subtree: true,
+      attributes: true, // Observe attribute changes
+      childList: true, // Observe child list changes
+      subtree: true, // Observe subtree changes
     });
 
     return () => {
