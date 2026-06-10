@@ -25,6 +25,7 @@ import {
 import type { EditorState } from "lexical";
 import { InitializePlugin } from "@/routes/_auth/notes/-components/lexical-plugins/InitializePlugin";
 import { EDITOR_THEME } from "@/lib/constants";
+import { SlashMenuPlugin } from "@/routes/_auth/notes/-components/lexical-plugins/SlashMenuPlugin";
 
 interface EditorProps {
   initialContent: string;
@@ -87,6 +88,7 @@ export function Editor({
       <HistoryPlugin />
       <AutoFocusPlugin />
       <MarkdownShortcutPlugin transformers={CUSTOM_MARKDOWN_TRANSFORMERS} />
+      <SlashMenuPlugin />
     </LexicalComposer>
   );
 }

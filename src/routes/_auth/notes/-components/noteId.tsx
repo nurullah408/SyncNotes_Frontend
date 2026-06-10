@@ -120,7 +120,7 @@ export function Note() {
             )}
           </div>
           <Popover>
-            <PopoverTrigger>
+            <PopoverTrigger asChild>
               <Button variant="outline" size={"icon-xs"} className="rounded-lg">
                 <Cog className="size-4" />
               </Button>
