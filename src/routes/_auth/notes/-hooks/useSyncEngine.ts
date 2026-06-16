@@ -39,6 +39,7 @@ export function useGlobalSyncEngine() {
               ? note.title.trim()
               : "Untitled",
           content: parsedContent,
+          searchContent: note.searchContent || "",
           updatedAt: note.updatedAt,
           isDeleted: !!note.isDeleted,
         };
@@ -103,6 +104,7 @@ export function useGlobalSyncEngine() {
           id: serverNote.id,
           title: serverNote.title,
           content: serverNote.content,
+          searchContent: serverNote.searchContent,
           updatedAt: serverNote.updatedAt,
           isDeleted: serverNote.isDeleted,
         }));
