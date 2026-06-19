@@ -1,5 +1,8 @@
-export type NoteSearchResult = {
-  id: string;
-  title: string;
-  updatedAt: string;
-};
+import type { Note } from "./Note";
+
+export interface SearchNoteResult extends Pick<
+  Note,
+  "id" | "title" | "updatedAt"
+> {
+  searchContent: string;
+}
