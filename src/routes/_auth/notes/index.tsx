@@ -27,6 +27,7 @@ function Index() {
       id: newNoteId,
       title: "Untitled",
       content: EMPTY_CONTENT,
+      searchContent: "",
       updatedAt: new Date().toISOString(),
     });
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });

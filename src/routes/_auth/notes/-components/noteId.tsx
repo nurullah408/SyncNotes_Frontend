@@ -7,12 +7,11 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, Cog, LoaderPinwheel } from "lucide-react";
+import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useNoteActions } from "../-hooks/useNoteActions.ts";
 import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
 import { useNoteDetail } from "../-hooks/useNoteDetail.ts";
-import Clock from "@/components/clock.tsx";
 import {
   Popover,
   PopoverContent,
@@ -22,6 +21,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
 import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { useGlobalStore } from "@/store/store.tsx";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
@@ -39,6 +39,8 @@ export function Note() {
     setNoteSettings({ ...noteSettings, [name]: value });
   }
 
+  const openModal = useGlobalStore((state) => state.openModal);
+
   const { open } = useSidebar();
 
   const { sync, isSyncing } = useGlobalSyncEngine();
@@ -53,6 +55,10 @@ export function Note() {
     await saveNote({ ...updates, id: params.noteId });
   }, 500);
 
+  function onOpenSearch() {
+    openModal("GLOBAL_SEARCH", null);
+  }
+
   function onChangeTitle(event: ChangeEvent<HTMLInputElement>) {
     const { value } = event.currentTarget;
     updateNote({ ...note, title: value });
@@ -63,12 +69,15 @@ export function Note() {
       const root = $getRoot();
 
       const json = root.isEmpty()
-        ? INITIAL_EDITOR_STATE
+        ? INITIAL_EDITOR_STATE // This is already stringified
         : JSON.stringify(editorState.toJSON());
+
+      const textContent = root.getTextContent();
 
       updateNote({
         ...note,
         content: json,
+        searchContent: textContent,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -102,10 +111,14 @@ export function Note() {
             <SidebarTrigger />
           </Button>
         </div>
-        <Clock
-          showSeconds={noteSettings.showSeconds}
-          hourFormat={noteSettings.hourFormat}
-        />
+        <Button
+          variant={"outline"}
+          className="justify-between w-[40%] rounded-[10px]"
+          onClick={onOpenSearch}
+        >
+          <Search />
+          {"cmd+k"}
+        </Button>
         {/* Note header right side */}
         <div className="flex gap-1 items-center">
           <div className="flex items-center gap-1">
