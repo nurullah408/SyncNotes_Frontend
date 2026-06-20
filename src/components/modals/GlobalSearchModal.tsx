@@ -1,4 +1,4 @@
-import { useDeferredValue, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -108,7 +108,8 @@ function SearchResult({
 }: SearchNoteResult) {
   const navigate = useNavigate();
   const closeModal = useGlobalStore((state) => state.closeModal);
-  const onClick = async () => {
+  const onClick =
+   async () => {
     closeModal();
     await navigate({
       to: "/notes/$noteId",
