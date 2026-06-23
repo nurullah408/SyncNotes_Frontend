@@ -1,8 +1,9 @@
-export interface Note {
-  id: string;
+import type { Entity } from "./Entity";
+
+export interface Note extends Entity {
   title: string;
+  folderId: string | null;
   content: string;
   searchContent: string;
-  updatedAt: string;
   isDeleted?: boolean;
 }
