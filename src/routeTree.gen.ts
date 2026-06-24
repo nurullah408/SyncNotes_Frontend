@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as AuthNotesRouteRouteImport } from './routes/_auth/notes/route'
 import { Route as AuthNotesIndexRouteImport } from './routes/_auth/notes/index'
@@ -23,6 +24,11 @@ const AuthRoute = AuthRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupIndexRoute = SignupIndexRouteImport.update({
+  id: '/signup/',
+  path: '/signup/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginIndexRoute = LoginIndexRouteImport.update({
@@ -50,12 +56,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/notes': typeof AuthNotesRouteRouteWithChildren
   '/login/': typeof LoginIndexRoute
+  '/signup/': typeof SignupIndexRoute
   '/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/notes/': typeof AuthNotesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginIndexRoute
+  '/signup': typeof SignupIndexRoute
   '/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/notes': typeof AuthNotesIndexRoute
 }
@@ -65,20 +73,28 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteWithChildren
   '/_auth/notes': typeof AuthNotesRouteRouteWithChildren
   '/login/': typeof LoginIndexRoute
+  '/signup/': typeof SignupIndexRoute
   '/_auth/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/_auth/notes/': typeof AuthNotesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/notes' | '/login/' | '/notes/$noteId' | '/notes/'
+  fullPaths:
+    | '/'
+    | '/notes'
+    | '/login/'
+    | '/signup/'
+    | '/notes/$noteId'
+    | '/notes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/notes/$noteId' | '/notes'
+  to: '/' | '/login' | '/signup' | '/notes/$noteId' | '/notes'
   id:
     | '__root__'
     | '/'
     | '/_auth'
     | '/_auth/notes'
     | '/login/'
+    | '/signup/'
     | '/_auth/notes/$noteId'
     | '/_auth/notes/'
   fileRoutesById: FileRoutesById
@@ -87,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   LoginIndexRoute: typeof LoginIndexRoute
+  SignupIndexRoute: typeof SignupIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -103,6 +120,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup/': {
+      id: '/signup/'
+      path: '/signup'
+      fullPath: '/signup/'
+      preLoaderRoute: typeof SignupIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login/': {
@@ -164,6 +188,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   LoginIndexRoute: LoginIndexRoute,
+  SignupIndexRoute: SignupIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
