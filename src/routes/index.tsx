@@ -21,17 +21,30 @@ function RouteComponent() {
             <IconV1 className="w-full h-full" />
           </Link>
         </div>
-        <Button asChild>
-          <Link
-            to="/login"
-            viewTransition={{
-              types: ["slide-left"],
-            }}
-            preload={false}
-          >
-            Login
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild>
+            <Link
+              to="/login"
+              viewTransition={{
+                types: ["slide-left"],
+              }}
+              preload={false}
+            >
+              Login
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link
+              to="/signup"
+              viewTransition={{
+                types: ["slide-left"],
+              }}
+              preload={false}
+            >
+              Signup
+            </Link>
+          </Button>
+        </div>
       </Header>
       <section className="h-screen w-screen grid lg:flex p-4">
         {/* Left side content */}
