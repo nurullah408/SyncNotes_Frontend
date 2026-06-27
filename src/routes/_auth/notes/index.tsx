@@ -25,10 +25,13 @@ function Index() {
     const newNoteId = crypto.randomUUID();
     await db.notes.add({
       id: newNoteId,
+      folderId: null,
       title: "Untitled",
       content: EMPTY_CONTENT,
       searchContent: "",
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      deletedAt: null,
     });
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
   }

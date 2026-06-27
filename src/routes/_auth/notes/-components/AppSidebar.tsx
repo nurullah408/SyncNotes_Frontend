@@ -20,9 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/lib/utils.ts";
+import type { Folder } from "@/types/Folder.ts";
 
 interface AppSidebarProps {
   notes: Note[] | undefined;
+  folders: Folder[] | undefined;
   isLoading: boolean;
 }
 
