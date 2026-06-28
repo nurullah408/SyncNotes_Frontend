@@ -5,14 +5,22 @@ import {
   SidebarHeader,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import type { Note } from "@/types/Note";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Ellipsis, FileText, Plus, Trash } from "lucide-react";
-import { useNoteActions } from "../-hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
+import {
+  Ellipsis,
+  FileText,
+  FolderClosed,
+  FolderOpen,
+  Plus,
+  Trash,
+} from "lucide-react";
+import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
+import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +29,11 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { Folder } from "@/types/Folder.ts";
+import { useMemo, useState } from "react";
+import { buildFlatList } from "@/lib/sidebar-utils.ts";
+import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
+import type { FolderItem } from "@/types/util-types/FolderItem.ts";
+import type { NoteItem } from "@/types/util-types/NoteItem.ts";
 
 interface AppSidebarProps {
   notes: Note[] | undefined;
@@ -28,12 +41,25 @@ interface AppSidebarProps {
   isLoading: boolean;
 }
 
-export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
+export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const { sync } = useGlobalSyncEngine();
   const { saveNote } = useNoteActions(sync);
+
+  const [collapsedFolders, setCollapsedFolders] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleFolder = (folderId: string) => {
+    setCollapsedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
+  };
+
+  const visibleItems = useMemo(() => {
+    if (!notes || !folders) return [];
+    return buildFlatList(notes, folders, collapsedFolders);
+  }, [notes, folders, collapsedFolders]);
 
   async function createNewNote() {
     const newNoteId = crypto.randomUUID();
@@ -48,28 +74,33 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
   }
 
-  async function deleteNote(noteId: string) {
-    const active = location.pathname.includes(`/notes/${noteId}`);
-    if (active) {
-      let nextRoute = "/notes";
-      let nextParams = {};
+  async function onDelete(itemType: "folder" | "note", itemId: string) {
+    if (itemType === "note") {
+      const active = location.pathname.includes(`/notes/${itemId}`);
+      if (active) {
+        let nextRoute = "/notes";
+        let nextParams = {};
 
-      if (notes && notes.length > 1) {
-        const currentIndex = notes.findIndex((n) => n.id === noteId);
-        const nextNote =
-          currentIndex === notes.length - 1
-            ? notes[currentIndex - 1]
-            : notes[currentIndex + 1];
-        if (nextNote) {
-          nextRoute = "/notes/$noteId";
-          nextParams = {
-            $noteId: nextNote,
-          };
+        if (notes && notes.length > 1) {
+          const currentIndex = notes.findIndex((n) => n.id === itemId);
+          const nextNote =
+            currentIndex === notes.length - 1
+              ? notes[currentIndex - 1]
+              : notes[currentIndex + 1];
+          if (nextNote) {
+            nextRoute = "/notes/$noteId";
+            nextParams = {
+              $noteId: nextNote,
+            };
+          }
         }
+        navigate({ to: nextRoute, params: nextParams });
       }
-      navigate({ to: nextRoute, params: nextParams });
+      await saveNote({ id: itemId, isDeleted: true });
+      return;
+    } else {
+      return;
     }
-    await saveNote({ id: noteId, isDeleted: true });
   }
 
   return (
@@ -86,9 +117,15 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
                 className="w-full flex justify-center rounded-[10px] overflow-hidden duration-400 animate-pulse"
               />
             ))
-          : notes?.map((note: Note) => {
-              return (
-                <NoteItem key={note.id} note={note} deleteNote={deleteNote} />
+          : visibleItems?.map((item: FlatListItem) => {
+              return item.type === "folder" ? (
+                <FolderRow
+                  folder={{ ...item }}
+                  isOpen={collapsedFolders[item.id]}
+                  onDelete={onDelete}
+                />
+              ) : (
+                <NoteRow note={{ ...item }} onDelete={onDelete} />
               );
             })}
         <SidebarMenuItem className="w-full flex justify-center rounded-[10px] overflow-hidden">
@@ -105,12 +142,52 @@ export function AppSidebar({ notes, isLoading }: AppSidebarProps) {
   );
 }
 
-function NoteItem({
-  note,
-  deleteNote,
+function FolderRow({
+  folder,
+  isOpen,
+  onDelete,
 }: {
-  note: Note;
-  deleteNote: (note: string) => Promise<void>;
+  folder: FolderItem;
+  isOpen: boolean;
+  onDelete: (itemType: "folder", itemId: string) => Promise<void>;
+}) {
+  return (
+    <SidebarMenuItem
+      key={folder.id}
+      className={cn(
+        "flex items-center w-full border rounded-[30px] relative overflow-hidden",
+      )}
+    >
+      {isOpen ? <FolderOpen /> : <FolderClosed />} {folder.name}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className={cn("flex-1 rounded-r-[30px] pr-0 hover:bg-transparent")}
+        >
+          <Ellipsis className={cn("h-full size-4")} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={10} className="rounded-lg">
+          <DropdownMenuItem asChild>
+            <Button
+              variant={"destructive"}
+              className="w-full rounded-sm"
+              onClick={() => onDelete("folder", folder.id)}
+            >
+              <Trash className="size-4" />
+              Delete
+            </Button>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
+}
+
+function NoteRow({
+  note,
+  onDelete,
+}: {
+  note: NoteItem;
+  onDelete: (itemType: "note", itemId: string) => Promise<void>;
 }) {
   const location = useLocation();
 
@@ -160,7 +237,7 @@ function NoteItem({
             <Button
               variant={"destructive"}
               className="w-full rounded-sm"
-              onClick={() => deleteNote(note.id)}
+              onClick={() => onDelete("note", note.id)}
             >
               <Trash className="size-4" />
               Delete

@@ -2,9 +2,9 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "./-components/AppSidebar";
-import { useNotes } from "./-hooks/useNotes.ts";
-import { SyncManager } from "./-components/SyncManager.tsx";
-import { useFolders } from "./-hooks/useFolders.ts";
+import { useNotes } from "../../../hooks/useNotes.ts";
+import { SyncManager } from "../../../components/SyncManager.tsx";
+import { useFolders } from "../../../hooks/useFolders.ts";
 
 export const Route = createFileRoute("/_auth/notes")({
   component: Index,
@@ -17,7 +17,11 @@ function Index() {
     <Fragment>
       <SidebarProvider>
         <SyncManager />
-        <AppSidebar isLoading={isNotesLoading} notes={notes} />
+        <AppSidebar
+          isLoading={isNotesLoading || isFoldersLoading}
+          notes={notes}
+          folders={folders}
+        />
         <SidebarInset className="">
           <div className="w-full h-screen">
             <Outlet />
