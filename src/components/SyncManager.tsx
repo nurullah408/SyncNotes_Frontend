@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useGlobalSyncEngine } from "../-hooks/useSyncEngine";
+import { useGlobalSyncEngine } from "../hooks/useSyncEngine";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useWindowVisibility } from "@/hooks/useWindowVisibility";
 
