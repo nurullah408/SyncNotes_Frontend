@@ -5,7 +5,6 @@ import {
   SidebarHeader,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
@@ -120,12 +119,17 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
           : visibleItems?.map((item: FlatListItem) => {
               return item.type === "folder" ? (
                 <FolderRow
+                  key={`${item.type}-${item.id}`}
                   folder={{ ...item }}
                   isOpen={collapsedFolders[item.id]}
                   onDelete={onDelete}
                 />
               ) : (
-                <NoteRow note={{ ...item }} onDelete={onDelete} />
+                <NoteRow
+                  key={`${item.type}-${item.id}`}
+                  note={{ ...item }}
+                  onDelete={onDelete}
+                />
               );
             })}
         <SidebarMenuItem className="w-full flex justify-center rounded-[10px] overflow-hidden">

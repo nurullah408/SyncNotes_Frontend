@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useFolders() {
   return useQuery({
-    queryKey: QUERY_KEYS.lists(),
+    queryKey: QUERY_KEYS.foldersList(),
     queryFn: async () => {
       return db.folders.reverse().sortBy("lastUpdated");
     },

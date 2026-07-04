@@ -74,7 +74,8 @@ export function useGlobalSyncEngine() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lists() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.foldersList() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notesList() });
     },
     onError: (error) => {
       toast.error("Sync failed");
