@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useNotes() {
   return useQuery({
-    queryKey: QUERY_KEYS.lists(),
+    queryKey: QUERY_KEYS.notesAll,
     queryFn: async () => {
       return db.notes.reverse().sortBy("lastUpdated");
     },

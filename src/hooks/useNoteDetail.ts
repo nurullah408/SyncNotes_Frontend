@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useNoteDetail(id: string) {
   return useQuery({
-    queryKey: QUERY_KEYS.detail(id),
+    queryKey: QUERY_KEYS.notesDetail(id),
     queryFn: async () => {
       if (!id) return null;
       const note = await db.notes.get(id);
