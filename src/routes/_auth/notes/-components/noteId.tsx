@@ -9,9 +9,9 @@ import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
 import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
 import { type ChangeEvent } from "react";
-import { useNoteActions } from "../-hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../-hooks/useSyncEngine.ts";
-import { useNoteDetail } from "../-hooks/useNoteDetail.ts";
+import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
+import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
+import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
 import {
   Popover,
   PopoverContent,
