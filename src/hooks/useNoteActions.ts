@@ -13,10 +13,12 @@ export function useNoteActions(triggerSync: () => void) {
       isDeleted: !!note.isDeleted,
     } as Note);
 
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lists() });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notesList() });
 
     if (note?.id) {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.detail(note.id) });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.notesDetail(note.id),
+      });
     }
 
     triggerSync();
@@ -28,7 +30,7 @@ export function useNoteActions(triggerSync: () => void) {
       updatedAt: new Date().toISOString(),
     });
 
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lists() });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notesList() });
 
     triggerSync();
   };

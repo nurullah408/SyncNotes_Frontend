@@ -15,6 +15,8 @@ import {
   FileText,
   FolderClosed,
   FolderOpen,
+  FolderPlus,
+  Move,
   Plus,
   Trash,
 } from "lucide-react";
@@ -33,6 +35,7 @@ import { buildFlatList } from "@/lib/sidebar-utils.ts";
 import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
 import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
+import { useFolderActions } from "@/hooks/useFolderActions.ts";
 
 interface AppSidebarProps {
   notes: Note[] | undefined;
@@ -46,6 +49,7 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
 
   const { sync } = useGlobalSyncEngine();
   const { saveNote } = useNoteActions(sync);
+  const { saveFolder } = useFolderActions(sync);
 
   const [collapsedFolders, setCollapsedFolders] = useState<
     Record<string, boolean>
@@ -109,6 +113,19 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
         <SidebarTrigger className="rounded-[10px]" />
       </SidebarHeader>
       <SidebarContent className="px-2 mt-2">
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={createNewNote}
+            variant="outline"
+            size="icon-sm"
+            className="rounded-[10px]"
+          >
+            <Plus className="size-4" />
+          </Button>
+          <Button variant="outline" size="icon-sm" className="rounded-[10px]">
+            <FolderPlus className="size-4" />
+          </Button>
+        </div>
         {isLoading
           ? Array.from({ length: 10 }).map((_, i) => (
               <SidebarMenuItem
@@ -132,15 +149,6 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
                 />
               );
             })}
-        <SidebarMenuItem className="w-full flex justify-center rounded-[10px] overflow-hidden">
-          <Button
-            variant="ghost"
-            className="w-full rounded-lg"
-            onClick={createNewNote}
-          >
-            <Plus /> New Note
-          </Button>
-        </SidebarMenuItem>
       </SidebarContent>
     </Sidebar>
   );
@@ -237,6 +245,16 @@ function NoteRow({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={10} className="rounded-lg">
+          <DropdownMenuItem asChild>
+            <Button
+              variant={"outline"}
+              className="w-full rounded-sm"
+              onClick={() => onDelete("note", note.id)}
+            >
+              <Move className="size-4" />
+              Move to folder
+            </Button>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Button
               variant={"destructive"}
