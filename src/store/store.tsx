@@ -1,3 +1,4 @@
+import type { DialogPropsMap } from "@/types/DialogPropsMap";
 import type { ModalType } from "@/types/ModalType";
 import type { User } from "@/types/User";
 import { create } from "zustand";
@@ -11,7 +12,10 @@ type GlobalState = {
 type StoreActions = {
   setUser: (user: User | null) => void;
   getUser: () => User | null;
-  openModal: (modalType: ModalType, props: unknown) => void;
+  openModal: <T extends ModalType>(
+    modalType: T,
+    props: DialogPropsMap[T] | null,
+  ) => void;
   closeModal: () => void;
 };
 
@@ -28,11 +32,12 @@ export const useGlobalStore = create<GlobalState & StoreActions>(
     // Modal Functions & State
     activeModal: null,
     modalProps: null,
-    openModal: (activeModal: ModalType, modalProps = null) =>
+    openModal: (activeModal: ModalType, modalProps = null) => {
       set({
         activeModal,
         modalProps,
-      }),
+      });
+    },
     closeModal: () => set({ activeModal: null, modalProps: null }),
   }),
 );

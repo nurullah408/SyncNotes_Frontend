@@ -36,6 +36,7 @@ import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
 import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
 import { useFolderActions } from "@/hooks/useFolderActions.ts";
+import { useGlobalStore } from "@/store/store.tsx";
 
 interface AppSidebarProps {
   notes: Note[] | undefined;
@@ -50,6 +51,8 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
   const { sync } = useGlobalSyncEngine();
   const { saveNote } = useNoteActions(sync);
   const { saveFolder } = useFolderActions(sync);
+
+  const openModal = useGlobalStore((state) => state.openModal);
 
   const [collapsedFolders, setCollapsedFolders] = useState<
     Record<string, boolean>
@@ -69,6 +72,7 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
   const toggleFolder = (folderId: string) => {
     setCollapsedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
   };
+
   const createNewNote = async () => {
     const newNoteId = crypto.randomUUID();
     await saveNote({
@@ -109,6 +113,10 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
     } else {
       return;
     }
+  };
+
+  const onMoveNote = (noteId: string) => {
+    openModal("MOVE_NOTE", { noteId });
   };
 
   const visibleItems = useMemo(() => {
@@ -162,6 +170,7 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
                   key={`${item.type}-${item.id}`}
                   note={{ ...item }}
                   onDelete={onDelete}
+                  onMoveNote={(noteId) => onMoveNote(noteId)}
                 />
               );
             })}
@@ -232,8 +241,10 @@ function FolderRow({
 function NoteRow({
   note,
   onDelete,
+  onMoveNote,
 }: {
   note: NoteItem;
+  onMoveNote: (noteId: string) => void;
   onDelete: (itemType: "note", itemId: string) => Promise<void>;
 }) {
   const location = useLocation();
@@ -284,10 +295,10 @@ function NoteRow({
             <Button
               variant={"outline"}
               className="w-full rounded-sm"
-              onClick={() => onDelete("note", note.id)}
+              onClick={() => onMoveNote(note.id)}
             >
               <Move className="size-4" />
-              Move to folder
+              Move Note
             </Button>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
