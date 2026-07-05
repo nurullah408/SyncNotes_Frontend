@@ -55,16 +55,21 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
     Record<string, boolean>
   >({});
 
+  const createNewFolder = async () => {
+    const newFolderId = crypto.randomUUID();
+    await saveFolder({
+      id: newFolderId,
+      name: "Untitled",
+      color: "#ffff",
+      updatedAt: new Date().toISOString(),
+      isDeleted: false,
+    });
+  };
+
   const toggleFolder = (folderId: string) => {
     setCollapsedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
   };
-
-  const visibleItems = useMemo(() => {
-    if (!notes || !folders) return [];
-    return buildFlatList(notes, folders, collapsedFolders);
-  }, [notes, folders, collapsedFolders]);
-
-  async function createNewNote() {
+  const createNewNote = async () => {
     const newNoteId = crypto.randomUUID();
     await saveNote({
       id: newNoteId,
@@ -75,9 +80,9 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
       isDeleted: false,
     });
     navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
-  }
+  };
 
-  async function onDelete(itemType: "folder" | "note", itemId: string) {
+  const onDelete = async (itemType: "folder" | "note", itemId: string) => {
     if (itemType === "note") {
       const active = location.pathname.includes(`/notes/${itemId}`);
       if (active) {
@@ -104,7 +109,12 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
     } else {
       return;
     }
-  }
+  };
+
+  const visibleItems = useMemo(() => {
+    if (!notes || !folders) return [];
+    return buildFlatList(notes, folders, collapsedFolders);
+  }, [notes, folders, collapsedFolders]);
 
   return (
     <Sidebar>
@@ -122,7 +132,12 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
           >
             <Plus className="size-4" />
           </Button>
-          <Button variant="outline" size="icon-sm" className="rounded-[10px]">
+          <Button
+            onClick={createNewFolder}
+            variant="outline"
+            size="icon-sm"
+            className="rounded-[10px]"
+          >
             <FolderPlus className="size-4" />
           </Button>
         </div>
@@ -140,6 +155,7 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
                   folder={{ ...item }}
                   isOpen={collapsedFolders[item.id]}
                   onDelete={onDelete}
+                  onToggle={() => toggleFolder(item.id)}
                 />
               ) : (
                 <NoteRow
@@ -157,10 +173,12 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
 function FolderRow({
   folder,
   isOpen,
+  onToggle,
   onDelete,
 }: {
   folder: FolderItem;
   isOpen: boolean;
+  onToggle: () => void;
   onDelete: (itemType: "folder", itemId: string) => Promise<void>;
 }) {
   return (
@@ -170,7 +188,24 @@ function FolderRow({
         "flex items-center w-full border rounded-[30px] relative overflow-hidden",
       )}
     >
-      {isOpen ? <FolderOpen /> : <FolderClosed />} {folder.name}
+      <SidebarMenuButton
+        asChild
+        className={cn("p-0 hover:bg-transparent hover:text-none")}
+        onClick={onToggle}
+      >
+        <div
+          className={cn(
+            "flex-6 py-0.5 pl-2 flex items-center gap-2 text-center rounded-l-[30px]",
+          )}
+        >
+          {isOpen ? (
+            <FolderOpen className="size-4" />
+          ) : (
+            <FolderClosed className="size-4" />
+          )}{" "}
+          {folder.name}
+        </div>
+      </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn("flex-1 rounded-r-[30px] pr-0 hover:bg-transparent")}

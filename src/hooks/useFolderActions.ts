@@ -10,7 +10,6 @@ export function useFolderActions(triggerSync: () => void) {
     await db.folders.put({
       ...folder,
       updatedAt: new Date().toISOString(),
-      isDeleted: !!folder.isDeleted,
     } as Folder);
 
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.foldersList() });

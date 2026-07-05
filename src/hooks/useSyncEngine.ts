@@ -28,9 +28,9 @@ export function useGlobalSyncEngine() {
 
       const upstreamFolders = dirtyFolders.map((folder) => ({
         id: folder.id,
-        name: folder.name || "Untitled Folder",
+        name: folder.name || "Untitled",
         color: folder.color || "#ffff",
-        isDeleted: !!folder.id,
+        isDeleted: folder.isDeleted,
         updatedAt: folder.updatedAt,
         deletedAt: folder.updatedAt,
         createdAt: folder.createdAt,

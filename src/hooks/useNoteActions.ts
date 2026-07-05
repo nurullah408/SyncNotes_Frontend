@@ -10,7 +10,6 @@ export function useNoteActions(triggerSync: () => void) {
     await db.notes.put({
       ...note,
       updatedAt: new Date().toISOString(),
-      isDeleted: !!note.isDeleted,
     } as Note);
 
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notesList() });
