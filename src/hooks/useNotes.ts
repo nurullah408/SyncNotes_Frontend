@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useNotes() {
   return useQuery({
-    queryKey: QUERY_KEYS.notesAll,
+    queryKey: QUERY_KEYS.notesList(),
     queryFn: async () => {
       return db.notes
         .filter((n) => !n.isDeleted)

@@ -2,7 +2,6 @@ import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Toaster } from "sonner";
 import type { QueryClient } from "@tanstack/react-query";
-import { ModalManager } from "@/components/modals/ModalManager";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -13,7 +12,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     <>
       <Outlet />
       <Toaster />
-      <ModalManager />
       <TanStackRouterDevtools />
     </>
   ),

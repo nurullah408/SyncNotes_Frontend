@@ -62,7 +62,10 @@ export function AppSidebar() {
   };
 
   const toggleFolder = (folderId: string) => {
-    setCollapsedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
+    setCollapsedFolders((prev) => ({
+      ...prev,
+      [folderId]: !prev[folderId],
+    }));
   };
 
   const createNewNote = async () => {
@@ -147,22 +150,48 @@ export function AppSidebar() {
               />
             ))
           : visibleItems?.map((item: FlatListItem) => {
-              return item.type === "folder" ? (
-                <FolderRow
-                  key={`${item.type}-${item.id}`}
-                  folder={{ ...item }}
-                  isOpen={collapsedFolders[item.id]}
-                  onDelete={onDelete}
-                  onToggle={() => toggleFolder(item.id)}
-                />
-              ) : (
-                <NoteRow
-                  key={`${item.type}-${item.id}`}
-                  note={{ ...item }}
-                  onDelete={onDelete}
-                  onMoveNote={(noteId) => onMoveNote(noteId)}
-                />
-              );
+              if (item.type === "folder") {
+                const folderChildren = visibleItems.filter(
+                  (i) => i.type === "note" && i.folderId === item.id,
+                ) as NoteItem[];
+                return (
+                  <div key={item.id}>
+                    <FolderRow
+                      folder={{ ...item }}
+                      isOpen={!collapsedFolders[item.id]}
+                      onDelete={onDelete}
+                      onToggle={() => toggleFolder(item.id)}
+                    />
+                    <div
+                      className={cn(
+                        "overflow-hidden mt-2 transition-[max-height,opacity] duration-300 ease-in-out",
+                        collapsedFolders[item.id]
+                          ? "max-h-0 opacity-0"
+                          : "max-h-[100px] opacity-100",
+                      )}
+                    >
+                      {folderChildren.map((note: NoteItem) => (
+                        <NoteRow
+                          key={note.id}
+                          note={{ ...note }}
+                          onMoveNote={(noteId: string) => onMoveNote(noteId)}
+                          onDelete={onDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              if (!item.folderId) {
+                return (
+                  <NoteRow
+                    key={item.id}
+                    note={{ ...item }}
+                    onMoveNote={(noteId) => onMoveNote(noteId)}
+                    onDelete={onDelete}
+                  />
+                );
+              }
             })}
       </SidebarContent>
     </Sidebar>
@@ -180,6 +209,7 @@ function FolderRow({
   onToggle: () => void;
   onDelete: (itemType: "folder", itemId: string) => Promise<void>;
 }) {
+  // Open = children visible. Collapsed in buildFlatList is the inverse.
   return (
     <SidebarMenuItem
       key={folder.id}
@@ -245,9 +275,12 @@ function NoteRow({
     <SidebarMenuItem
       key={note.id}
       className={cn(
-        "flex items-center w-full border rounded-[30px] relative overflow-hidden",
+        "flex items-center border rounded-[30px] relative overflow-hidden pl-2",
         active ? "bg-primary text-white" : "",
       )}
+      style={{
+        marginLeft: `${note.depth * 16}px`,
+      }}
     >
       <SidebarMenuButton
         asChild
@@ -258,7 +291,7 @@ function NoteRow({
       >
         <Link
           className={cn(
-            "flex-6 py-0.5 pl-2 flex items-center gap-2 text-center rounded-l-[30px]",
+            "flex-6 py-0.5 flex items-center gap-2 text-center rounded-l-[30px]",
           )}
           to={`/notes/$noteId`}
           params={{ noteId: note.id }}
@@ -280,7 +313,11 @@ function NoteRow({
             className={cn("h-full size-4", active ? "text-white" : "")}
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={10} className="rounded-lg">
+        <DropdownMenuContent
+          align="start"
+          sideOffset={10}
+          className="flex flex-col gap-2 rounded-lg"
+        >
           <DropdownMenuItem asChild>
             <Button
               variant={"outline"}

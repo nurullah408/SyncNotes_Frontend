@@ -4,6 +4,7 @@ import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "./-components/AppSidebar";
 import { SyncProvider } from "@/context/SyncContext";
 import { SyncManager } from "@/components/SyncManager";
+import { ModalManager } from "@/components/modals/ModalManager";
 
 export const Route = createFileRoute("/_auth/notes")({
   component: Index,
@@ -14,6 +15,7 @@ function Index() {
     <Fragment>
       <SyncProvider>
         <SyncManager />
+        <ModalManager />
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset className="">
