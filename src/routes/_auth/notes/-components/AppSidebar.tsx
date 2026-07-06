@@ -7,8 +7,6 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { INITIAL_EDITOR_STATE } from "@/lib/constants";
-import type { Note } from "@/types/Note";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Ellipsis,
@@ -20,8 +18,7 @@ import {
   Plus,
   Trash,
 } from "lucide-react";
-import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
+import { useNoteActions } from "@/hooks/useNoteActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/lib/utils.ts";
-import type { Folder } from "@/types/Folder.ts";
 import { useMemo, useState } from "react";
 import { buildFlatList } from "@/lib/sidebar-utils.ts";
 import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
@@ -37,20 +33,18 @@ import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
 import { useFolderActions } from "@/hooks/useFolderActions.ts";
 import { useGlobalStore } from "@/store/store.tsx";
+import { useNotes } from "@/hooks/useNotes";
+import { useFolders } from "@/hooks/useFolders";
 
-interface AppSidebarProps {
-  notes: Note[] | undefined;
-  folders: Folder[] | undefined;
-  isLoading: boolean;
-}
-
-export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
+export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { sync } = useGlobalSyncEngine();
-  const { saveNote } = useNoteActions(sync);
-  const { saveFolder } = useFolderActions(sync);
+  const { data: notes, isLoading: isNotesLoading } = useNotes();
+  const { data: folders, isLoading: isFoldersLoading } = useFolders();
+
+  const { createNote, saveNote } = useNoteActions();
+  const { createFolder, saveFolder } = useFolderActions();
 
   const openModal = useGlobalStore((state) => state.openModal);
 
@@ -59,14 +53,12 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
   >({});
 
   const createNewFolder = async () => {
-    const newFolderId = crypto.randomUUID();
-    await saveFolder({
-      id: newFolderId,
-      name: "Untitled",
-      color: "#ffff",
-      updatedAt: new Date().toISOString(),
-      isDeleted: false,
-    });
+    await saveFolder(
+      createFolder({
+        id: crypto.randomUUID(),
+        name: "Untitled",
+      }),
+    );
   };
 
   const toggleFolder = (folderId: string) => {
@@ -74,16 +66,12 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
   };
 
   const createNewNote = async () => {
-    const newNoteId = crypto.randomUUID();
-    await saveNote({
-      id: newNoteId,
+    const note = createNote({
+      id: crypto.randomUUID(),
       title: "Untitled",
-      content: INITIAL_EDITOR_STATE,
-      searchContent: "",
-      updatedAt: new Date().toISOString(),
-      isDeleted: false,
     });
-    navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
+    await saveNote(note);
+    navigate({ to: `/notes/${note.id}`, params: { noteId: note.id } });
   };
 
   const onDelete = async (itemType: "folder" | "note", itemId: string) => {
@@ -123,6 +111,8 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
     if (!notes || !folders) return [];
     return buildFlatList(notes, folders, collapsedFolders);
   }, [notes, folders, collapsedFolders]);
+
+  const isLoading = isNotesLoading || isFoldersLoading;
 
   return (
     <Sidebar>

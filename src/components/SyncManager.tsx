@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
-import { useGlobalSyncEngine } from "../hooks/useSyncEngine";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useWindowVisibility } from "@/hooks/useWindowVisibility";
+import { useSyncContext } from "@/context/SyncContext";
 
 export function SyncManager() {
-  const { sync } = useGlobalSyncEngine();
+  const { sync } = useSyncContext();
   const hasInitiallySynced = useRef(false);
 
   const isOnline = useOnlineStatus();

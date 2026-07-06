@@ -14,7 +14,6 @@ import type { ApiResponse } from "@/types/response/ApiResponse";
 import type { SearchNoteResult } from "@/types/NoteSearchResult";
 import { useNavigate } from "@tanstack/react-router";
 import { SanitizedHTMLMarkup } from "../sanitized-html-markup";
-import { useGlobalStore } from "@/store/store";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 interface GlobalSearchModalProps {
@@ -36,6 +35,7 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
   const { data: results, isLoading } = useQuery<
     ApiResponse<SearchNoteResult[]>
   >({
+    enabled: search.length > 0,
     queryFn: async () => {
       const results = await apiClient(
         `${BASE_URL}/notes/search?query=${encodeURIComponent(search)}`,
@@ -79,7 +79,7 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
                   />
                 ))
               : results?.data?.map((res, i) => (
-                  <SearchResult key={i} {...res} />
+                  <SearchResult key={i} {...res} onClose={onClose} />
                 ))}
             {!isLoading && search.length === 0 && (
               <span className="text-center text-muted-foreground">
@@ -105,12 +105,12 @@ function SearchResult({
   title,
   updatedAt,
   searchContent,
-}: SearchNoteResult) {
+  onClose,
+}: SearchNoteResult & { onClose: () => void }) {
   const navigate = useNavigate();
-  const closeModal = useGlobalStore((state) => state.closeModal);
   const onClick =
    async () => {
-    closeModal();
+    onClose();
     await navigate({
       to: "/notes/$noteId",
       params: {

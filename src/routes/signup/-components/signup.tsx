@@ -1,4 +1,3 @@
-import { useGlobalStore } from "@/store/store";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
 import { signupSchema } from "../-schema/schema";
@@ -28,8 +27,6 @@ import { Input } from "@/components/ui/input";
 type ZFormValues = z.infer<typeof signupSchema>;
 
 export function Signup() {
-  const setUser = useGlobalStore((state) => state.setUser);
-
   const router = useRouter();
 
   const signupMutation = useMutation({
@@ -50,8 +47,7 @@ export function Signup() {
       }
       return result.json();
     },
-    onSuccess: async (result) => {
-      setUser(result.data);
+    onSuccess: async () => {
       await router.invalidate();
       await router.navigate({
         to: "/notes",

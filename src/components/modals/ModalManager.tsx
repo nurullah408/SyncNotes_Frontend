@@ -16,7 +16,12 @@ export function ModalManager() {
     }
     case "MOVE_NOTE": {
       const moveFolderProps = modalProps as DialogPropsMap["MOVE_NOTE"];
-      return <FolderSearchModal noteId={moveFolderProps.noteId} />;
+      return (
+        <FolderSearchModal
+          noteId={moveFolderProps.noteId}
+          onClose={closeModal}
+        />
+      );
     }
     default:
       return null;

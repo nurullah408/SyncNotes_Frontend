@@ -10,8 +10,8 @@ import { $getRoot, type EditorState } from "lexical";
 import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
 import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
+import { useSyncContext } from "@/context/SyncContext";
 import {
   Popover,
   PopoverContent,
@@ -43,9 +43,9 @@ export function Note() {
 
   const { open } = useSidebar();
 
-  const { sync, isSyncing } = useGlobalSyncEngine();
+  const { isSyncing } = useSyncContext();
 
-  const { saveNote } = useNoteActions(sync);
+  const { saveNote } = useNoteActions();
 
   const noteData = useNoteDetail(params.noteId);
 

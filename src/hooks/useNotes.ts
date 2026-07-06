@@ -6,8 +6,11 @@ export function useNotes() {
   return useQuery({
     queryKey: QUERY_KEYS.notesAll,
     queryFn: async () => {
-      return db.notes.reverse().sortBy("lastUpdated");
+      return db.notes
+        .filter((n) => !n.isDeleted)
+        .reverse()
+        .sortBy("lastUpdated");
     },
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 }

@@ -12,6 +12,6 @@ export function useNoteDetail(id: string) {
       return note;
     },
     enabled: !!id,
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 }

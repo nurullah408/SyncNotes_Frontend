@@ -63,9 +63,10 @@ export function useGlobalSyncEngine() {
           updatedAt: note.updatedAt,
           createdAt: note.updatedAt,
           deletedAt: note.deletedAt,
-          isDeleted: !!note.isDeleted,
+          isDeleted: note.isDeleted,
         };
       });
+
       await executePaginatedSync({
         foldersToUpload: upstreamFolders,
         notesToUpload: upstreamNotes,

@@ -6,8 +6,11 @@ export function useFolders() {
   return useQuery({
     queryKey: QUERY_KEYS.foldersList(),
     queryFn: async () => {
-      return db.folders.reverse().sortBy("lastUpdated");
+      return db.folders
+        .filter((f) => !f.isDeleted)
+        .reverse()
+        .sortBy("lastUpdated");
     },
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 }

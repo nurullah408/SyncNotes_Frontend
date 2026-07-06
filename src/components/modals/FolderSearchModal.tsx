@@ -12,18 +12,18 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Folder as FolderIcon } from "lucide-react";
-import { useGlobalSyncEngine } from "@/hooks/useSyncEngine";
 import { useNoteActions } from "@/hooks/useNoteActions";
-import { useGlobalStore } from "@/store/store";
 
 interface FolderSearchModalProps {
   noteId: string;
+  onClose: () => void;
 }
 
-export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
+export function FolderSearchModal({
+  noteId,
+  onClose,
+}: FolderSearchModalProps) {
   const [search, setSearch] = useState("");
-
-  const closeModal = useGlobalStore((state) => state.closeModal);
 
   const debouncedSetSearch = useDebouncedCallback(
     (searchQuery: string) => setSearch(searchQuery),
@@ -34,9 +34,7 @@ export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
     debouncedSetSearch(event.currentTarget.value);
   };
 
-  const { sync } = useGlobalSyncEngine();
-
-  const { saveNote } = useNoteActions(sync);
+  const { saveNote } = useNoteActions();
 
   const onMoveToFolder = async ({
     noteId,
@@ -49,7 +47,7 @@ export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
       id: noteId,
       folderId,
     });
-    closeModal();
+    onClose();
   };
 
   const { data: results, isLoading } = useQuery<Folder[]>({
@@ -63,13 +61,11 @@ export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
     queryKey: ["notes", "search", search],
   });
 
-  console.log(results);
-
   return (
     <Dialog
       open={true}
       onOpenChange={(open) => {
-        if (!open) closeModal();
+        if (!open) onClose();
       }}
     >
       <form>
@@ -99,7 +95,9 @@ export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
                   <SearchResult
                     key={i}
                     {...res}
-                    onClick={() => onMoveToFolder({ noteId, folderId: res.id })}
+                    onClick={() =>
+                      onMoveToFolder({ noteId, folderId: res.id })
+                    }
                   />
                 ))}
             {!isLoading && search.length === 0 && (
@@ -122,7 +120,6 @@ export function FolderSearchModal({ noteId }: FolderSearchModalProps) {
 function SearchResult({
   name,
   updatedAt,
-  color,
   onClick,
 }: Folder & { onClick: () => void }) {
   return (
