@@ -8,7 +8,7 @@ import type { Note } from "@/types/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
 import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
-import { type ChangeEvent, useRef } from "react";
+import { type ChangeEvent } from "react";
 import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
 import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
 import { useSyncContext } from "@/context/SyncContext";
@@ -22,12 +22,9 @@ import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { useGlobalStore } from "@/store/store.tsx";
-import { EditorFocusPlugin } from "./lexical-plugins/EditorFocusPlugin";
-import type { LexicalEditor } from "lexical";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
-  const editorRef = useRef<LexicalEditor | null>(null);
 
   const [noteSettings, setNoteSettings] = useLocalStorage<NoteSettings>(
     "note-settings",
@@ -95,8 +92,6 @@ export function Note() {
       )
     )
       return;
-
-    editorRef.current?.focus();
   };
 
   const title = note ? note.title : "Untitled";
@@ -188,9 +183,7 @@ export function Note() {
             placeholderClassName="absolute top-22 left-1 text-gray-400"
             initialContent={content}
             onChange={onEditorChange}
-          >
-            <EditorFocusPlugin editorRef={editorRef} />
-          </Editor>
+          />
         </div>
       </div>
     </div>
