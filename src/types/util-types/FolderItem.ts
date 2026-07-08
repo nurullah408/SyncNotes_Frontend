@@ -1,4 +1,4 @@
-import type { Folder } from "../Folder";
+import type { Folder } from "../entities/Folder";
 
 export interface FolderItem extends Folder {
   type: "folder";

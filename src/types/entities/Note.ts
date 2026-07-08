@@ -5,5 +5,4 @@ export interface Note extends Entity {
   folderId: string | null;
   content: string;
   searchContent: string;
-  isDeleted?: boolean;
 }

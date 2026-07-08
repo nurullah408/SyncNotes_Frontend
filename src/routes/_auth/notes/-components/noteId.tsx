@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
+import { Check, LoaderPinwheel, Search, Settings } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
 import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
@@ -150,7 +150,7 @@ export function Note() {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size={"icon-xs"} className="rounded-lg">
-                <Cog className="size-4" />
+                <Settings className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="rounded-lg">
