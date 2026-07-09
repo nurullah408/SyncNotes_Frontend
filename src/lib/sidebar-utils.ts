@@ -1,5 +1,5 @@
-import type { Folder } from "@/types/Folder";
-import type { Note } from "@/types/Note";
+import type { Folder } from "@/types/entities/Folder";
+import type { Note } from "@/types/entities/Note";
 import type { FlatListItem } from "@/types/util-types/FlatListItem";
 import type { FolderItem } from "@/types/util-types/FolderItem";
 import type { NoteItem } from "@/types/util-types/NoteItem";

@@ -4,13 +4,11 @@ import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useDebouncedCallback } from "@/hooks/useDebounce.ts";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { Note } from "@/types/Note";
+import type { Note } from "@/types/entities/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
 import { Check, LoaderPinwheel, Search, Settings } from "lucide-react";
 import { type ChangeEvent } from "react";
-import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
-import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
 import { useSyncContext } from "@/context/SyncContext";
 import {
   Popover,
@@ -22,9 +20,13 @@ import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { useGlobalStore } from "@/store/store.tsx";
+import { db } from "@/db/syncNotesDb.ts";
+import { useLiveQuery } from "dexie-react-hooks";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
+
+  const note = useLiveQuery(() => db.notes.get(params.noteId), [params.noteId]);
 
   const [noteSettings, setNoteSettings] = useLocalStorage<NoteSettings>(
     "note-settings",
@@ -45,15 +47,13 @@ export function Note() {
 
   const { isSyncing } = useSyncContext();
 
-  const { saveNote } = useNoteActions();
 
-  const noteData = useNoteDetail(params.noteId);
 
-  const note = noteData.data;
-
-  const updateNote = useDebouncedCallback(async (updates: Partial<Note>) => {
-    await saveNote({ ...updates, id: params.noteId });
-  }, 500);
+  const updateNote = useDebouncedCallback(
+    async (updates: Partial<Note>) => {
+      await db.notes.put({ ...updates, id: params.noteId } as Note);
+    },
+  500);
 
   function onOpenSearch() {
     openModal("GLOBAL_SEARCH", null);

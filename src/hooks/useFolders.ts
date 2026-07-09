@@ -9,7 +9,7 @@ export function useFolders() {
       return db.folders
         .filter((f) => !f.isDeleted)
         .reverse()
-        .sortBy("lastUpdated");
+        .sortBy("updatedAt");
     },
     staleTime: 1000 * 60 * 5,
   });

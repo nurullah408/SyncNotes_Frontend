@@ -152,299 +152,265 @@ export const db = new SyncNotesDb();
 
 ---
 
-## Phase 3: Generic Entity Actions Hook (Scalability Fix)
+## Phase 3: Automatic Change-Logging via Dexie Hooks
 
 ### Problem
 
-Every new entity type (notes, folders, tags, bookmarks, etc.) currently requires a dedicated
-`useXxxActions` hook that duplicates ~40 lines of identical logic:
+Every mutation on a synced entity (notes, folders, tags, bookmarks, etc.) must record a
+`ChangeRecord` in the `changes` table for the sync engine to pick up. Rather than forcing
+developers through a custom abstraction, we register **Dexie table hooks** that automatically
+log changes whenever a mutation occurs — consumers simply use `db.notes.put()`, `db.notes.delete()`,
+`useLiveQuery()`, `db.notes.where(...)`, etc. directly.
 
-```
-useNoteActions.ts   ─┐
-useFolderActions.ts ─┤  same pattern, different table & type
-useTagActions.ts    ─┤  (future: more copy-paste)
-useBookmarkActions  ─┘
-```
+### Why Dexie Hooks?
 
-Each hook repeats:
-1. Dexie `transaction("rw", ...)` wrapper
-2. `get(existing)` → merge → `put(merged)`
-3. `db.changes.add(changeRecord)`
-4. `queryClient.invalidateQueries(...)`
-5. `triggerSync()`
+| Approach | Atomicity | Flexibility | Complexity |
+|---|---|---|---|
+| Custom factory hook | ✅ same tx | ❌ locked API | Medium |
+| **Dexie hooks** | ❌ separate tx (pragmatic) | ✅ full Dexie API | **Low** |
+| Explicit `db.transaction()` everywhere | ✅ same tx | ✅ full API | High (dev burden) |
 
-### Solution: `createEntityActions<TEntity, TCreateInput>`
+Dexie hooks fire synchronously just before a mutation (create/update/delete) on a table.
+They receive the primary key, the entity object, and the active transaction. While they run
+in the same implicit transaction as the mutation, that transaction only covers the target
+table — so writing to `db.changes` from the hook creates a **separate** transaction. This
+means entity write and ChangeRecord write are not strictly atomic, but in practice IndexedDB
+failures are extremely rare and the sync engine naturally recovers on the next cycle.
 
-A generic factory function that takes an entity config and returns a fully type-safe hook.
-Adding a new entity becomes a **5-line wrapper** instead of a ~40-line copy-paste.
+> **Tradeoff accepted:** Non-atomic logging in exchange for full Dexie API access.
+> In practice, IndexedDB partial-failure scenarios on modern browsers are effectively zero.
 
-### 3.1 New File: `src/lib/entity-actions.ts`
+### How Dexie Hooks Work
+
+Dexie supports four hook types per table:
+
+| Hook | Fires when | Receives |
+|---|---|---|
+| `creating` | `table.add()` or `table.put()` with new key | `(primKey, obj, transaction)` |
+| `updating` | `table.put()` with existing key, or `table.update()` | `(modifications, primKey, obj, transaction)` |
+| `deleting` | `table.delete()` or `table.bulkDelete()` | `(primKey, obj, transaction)` |
+| `reading` | `table.get()` or `table.toArray()` | `(obj)` |
+
+For change-logging we only need `creating`, `updating`, and `deleting`. The hook callback
+runs synchronously before the mutation is committed, allowing us to inspect the full entity
+object and record the intended operation.
+
+**Important Dexie behavior:**
+- `put()`, `add()`, `update()`, `delete()`, and `bulkDelete()` **fire hooks**.
+- `bulkPut()` and `bulkAdd()` do **NOT** fire individual hooks. This is critical: the sync
+  engine uses `bulkPut` for downstream data and must NOT generate spurious change records.
+- `bulkDelete()` DOES fire `deleting` for each item. Downstream hard-deletes need special
+  handling (see §3.2).
+
+### 3.1 Modify: `src/db/syncNotesDb.ts`
+
+Add a helper function that registers hooks for any synced table, then register hooks for
+`notes` and `folders`.
 
 ```typescript
-import { db } from "@/db/syncNotesDb";
-import { useQueryClient } from "@tanstack/react-query";
-import { useSyncContext } from "@/context/SyncContext";
-import type { Table } from "dexie";
-import type { Entity } from "@/types/Entity";
-import type { ChangeRecord, ChangeEntityType, ChangeOperation } from "@/types/ChangeRecord";
+import type { ChangeRecord } from "@/types/ChangeRecord";
+import type { Folder } from "@/types/Folder";
+import type { Note } from "@/types/Note";
+import Dexie, { type Table } from "dexie";
 
 // ---------------------------------------------------------------------------
-// Config shape — one per entity type
+// Skip flag — set during downstream sync to avoid spurious change records
 // ---------------------------------------------------------------------------
+let __skipChangeHooks = false;
 
-export interface EntityActionConfig<TEntity extends Entity, TCreateInput> {
-  /** The Dexie table for this entity (db.notes, db.folders, etc.) */
-  table: Table<TEntity, string>;
-
-  /** The entity type string used in ChangeRecord.entityType */
-  entityType: ChangeEntityType;
-
-  /** React Query keys for list and detail */
-  queryKeys: {
-    list: () => readonly string[];
-    detail: (id: string) => readonly string[];
-  };
-
-  /**
-   * Build a new in-memory entity from a create input.
-   * Called by `create()` — does NOT write to DB.
-   */
-  buildDefaults: (input: TCreateInput) => TEntity;
-
-  /**
-   * Optional: custom merge logic when saving.
-   * Default: shallow spread `{ ...existing, ...update, updatedAt: now }`.
-   */
-  merge?: (existing: TEntity | undefined, update: Partial<TEntity>) => TEntity;
-}
+export function skipChangeHooks() { __skipChangeHooks = true; }
+export function resumeChangeHooks() { __skipChangeHooks = false; }
 
 // ---------------------------------------------------------------------------
-// Factory: returns a hook that consumers can rename for DX
+// Helper: register hooks that auto-log ChangeRecords on every mutation
 // ---------------------------------------------------------------------------
-
-export function createEntityActions<TEntity extends Entity, TCreateInput>(
-  config: EntityActionConfig<TEntity, TCreateInput>,
+function registerChangeHooks<T>(
+  table: Table<T, string>,
+  entityType: ChangeRecord["entityType"],
 ) {
-  return function useEntityActions() {
-    const queryClient = useQueryClient();
-    const { sync: triggerSync } = useSyncContext();
-
-    // ---- helpers ------------------------------------------------------------
-
-    const defaultMerge = (existing: TEntity | undefined, update: Partial<TEntity>): TEntity => ({
-      ...existing,
-      ...update,
-      updatedAt: new Date().toISOString(),
-    } as TEntity);
-
-    const recordChange = (
-      entityId: string,
-      operation: ChangeOperation,
-      payload: TEntity | undefined,
-    ): ChangeRecord => ({
-      entityType: config.entityType,
-      entityId,
-      operation,
-      payload: JSON.stringify(payload ?? {}),
+  table.hook("creating", (primKey, obj) => {
+    if (__skipChangeHooks) return;
+    db.changes.add({
+      entityType,
+      entityId: primKey as string,
+      operation: "create",
+      payload: JSON.stringify(obj),
       timestamp: new Date().toISOString(),
       synced: false,
     });
+  });
 
-    // ---- public API ---------------------------------------------------------
+  table.hook("updating", (_modifications, primKey, obj) => {
+    if (__skipChangeHooks) return;
+    db.changes.add({
+      entityType,
+      entityId: primKey as string,
+      operation: "update",
+      payload: JSON.stringify(obj),
+      timestamp: new Date().toISOString(),
+      synced: false,
+    });
+  });
 
-    /** Build an entity in memory (no DB write yet).  Call `save()` to persist. */
-    const create = (input: TCreateInput): TEntity => {
-      return config.buildDefaults(input);
-    };
+  table.hook("deleting", (primKey, obj) => {
+    if (__skipChangeHooks) return;
+    db.changes.add({
+      entityType,
+      entityId: primKey as string,
+      operation: "delete",
+      payload: JSON.stringify(obj),
+      timestamp: new Date().toISOString(),
+      synced: false,
+    });
+  });
+}
 
-    /** Insert or update. Records a change event atomically. */
-    const save = async (update: Partial<TEntity> & { id: string }) => {
-      if (!update.id) return;
+export class SyncNotesDb extends Dexie {
+  notes!: Table<Note, string>;
+  folders!: Table<Folder, string>;
+  changes!: Table<ChangeRecord, number>;
 
-      await db.transaction("rw", [config.table, db.changes], async () => {
-        const existing = await config.table.get(update.id);
-        const operation: ChangeOperation = existing ? "update" : "create";
-        const merged = (config.merge ?? defaultMerge)(existing, update);
+  constructor() {
+    super("SyncNotesDb");
 
-        await config.table.put(merged);
-        await db.changes.add(recordChange(update.id, operation, merged));
-      });
+    this.version(2).stores({
+      notes: "id, title, updatedAt, isDeleted",
+      folders: "id, name, updatedAt, isDeleted",
+    });
 
-      queryClient.invalidateQueries({ queryKey: config.queryKeys.list() });
-      queryClient.invalidateQueries({ queryKey: config.queryKeys.detail(update.id) });
-      triggerSync();
-    };
+    this.version(3).stores({
+      notes: "id, title, updatedAt, isDeleted",
+      folders: "id, name, updatedAt, isDeleted",
+      changes: "++id, entityType, entityId, operation, timestamp, synced",
+    });
 
-    /** Soft-delete by setting isDeleted: true. */
-    const remove = async (id: string) => {
-      await db.transaction("rw", [config.table, db.changes], async () => {
-        await config.table.update(id, {
-          isDeleted: true,
-          updatedAt: new Date().toISOString(),
-        } as Partial<TEntity>);
+    // Register hooks — tables are available as lazy proxies immediately
+    registerChangeHooks(this.notes, "note");
+    registerChangeHooks(this.folders, "folder");
+  }
+}
 
-        const existing = await config.table.get(id);
-        await db.changes.add(recordChange(id, "delete", existing));
-      });
+export const db = new SyncNotesDb();
+```
 
-      queryClient.invalidateQueries({ queryKey: config.queryKeys.list() });
-      triggerSync();
-    };
+**Key points:**
+- Hooks are registered once in the constructor, right after `version()` calls. Dexie `Table`
+  properties are lazy proxies — available immediately, no need for `db.on("ready")`.
+- Every `db.notes.put()`, `db.notes.delete()`, `db.notes.add()`, `db.notes.update()`, and
+  `db.notes.bulkDelete()` (and equivalents on `db.folders`) automatically creates a
+  `ChangeRecord` — no developer discipline required.
+- Adding a new synced entity (e.g., tags) requires exactly **one line**: calling
+  `registerChangeHooks(db.tags, "tag")` after adding the table to the schema.
+- The `__skipChangeHooks` flag is exported via `skipChangeHooks()`/`resumeChangeHooks()` so
+  the sync engine can temporarily suppress hooks during downstream `bulkDelete` calls.
 
-    /** Batch soft-delete (single transaction). */
-    const removeMany = async (ids: string[]) => {
-      if (ids.length === 0) return;
+### 3.2 Handling `bulkDelete` in the Sync Engine
 
-      await db.transaction("rw", [config.table, db.changes], async () => {
-        for (const id of ids) {
-          await config.table.update(id, {
-            isDeleted: true,
-            updatedAt: new Date().toISOString(),
-          } as Partial<TEntity>);
+Since `bulkDelete` fires `deleting` hooks per item, the downstream sync in Phase 6 would
+spuriously generate delete change records for server-sent hard-deletes. The sync engine
+wraps these calls with the skip flag:
 
-          const existing = await config.table.get(id);
-          await db.changes.add(recordChange(id, "delete", existing));
-        }
-      });
+```typescript
+// In useSyncEngine.ts — downstream processing (Phase 6)
+import { skipChangeHooks, resumeChangeHooks } from "@/db/syncNotesDb";
 
-      queryClient.invalidateQueries({ queryKey: config.queryKeys.list() });
-      triggerSync();
-    };
+// ... inside the downstream transaction:
+skipChangeHooks();
+await db.folders.bulkDelete(hardDeleteFolders);
+await db.notes.bulkDelete(hardDeleteNotes);
+resumeChangeHooks();
+```
 
-    return { create, save, remove, removeMany } as const;
+### 3.3 Lightweight Mutation Helper (optional)
+
+With hooks handling change-logging, the only remaining boilerplate per mutation is:
+1. React Query cache invalidation
+2. `triggerSync()`
+
+A tiny hook can centralize this without hiding Dexie:
+
+```typescript
+// src/hooks/useSyncActions.ts
+import { useQueryClient } from "@tanstack/react-query";
+import { useSyncContext } from "@/context/SyncContext";
+
+export function useSyncActions(queryKeys: {
+  list: () => readonly string[];
+  detail?: (id: string) => readonly string[];
+}) {
+  const queryClient = useQueryClient();
+  const { sync: triggerSync } = useSyncContext();
+
+  const afterMutation = (id?: string) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.list() });
+    if (id && queryKeys.detail) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.detail(id) });
+    }
+    triggerSync();
   };
+
+  return { afterMutation };
 }
 ```
 
-**Key design decisions:**
-
-| Decision | Rationale |
-|---|---|
-| `create()` returns an object, doesn't write DB | Callers need the ID before persisting (e.g., for `navigate()`) |
-| `save()` auto-detects create vs update via `config.table.get()` | No manual operation tracking needed |
-| `remove()` does soft-delete only | Matches current `isDeleted` pattern; backend handles hard-delete after sync |
-| `merge` is overridable per entity | Notes merge content differently than folders merge color — but the default `{...spread}` works for both |
-| `Table` type from Dexie ensures compile-time safety | `config.table.put(x)` fails at build if `x` doesn't match `TEntity` |
-
----
-
-### 3.2 Refactor: `src/hooks/useNoteActions.ts` → thin wrapper
-
-Old: ~70 lines of inline logic.  
-New: ~30 lines — just the config + factory call.
+**Usage at call sites** — consumers use Dexie directly for the mutation, then call `afterMutation`:
 
 ```typescript
-import { createEntityActions } from "@/lib/entity-actions";
-import { db } from "@/db/syncNotesDb";
-import { INITIAL_EDITOR_STATE, QUERY_KEYS } from "@/lib/constants";
-import type { Note } from "@/types/Note";
-
-/** Input shape for `createNote(...)` — caller provides partial overrides. */
-type CreateNoteInput = Partial<Pick<Note, "id" | "title" | "folderId" | "content">>;
-
-const buildDefaults = (input: CreateNoteInput): Note => ({
-  id: input.id || crypto.randomUUID(),
-  title: input.title || "Untitled",
-  folderId: input.folderId || null,
-  content: input.content || INITIAL_EDITOR_STATE,
-  searchContent: "",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  isDeleted: false,
-  deletedAt: null,
+const { afterMutation } = useSyncActions({
+  list: () => QUERY_KEYS.notesList(),
+  detail: (id) => QUERY_KEYS.notesDetail(id),
 });
 
-/** Re-export under the familiar names consumers expect. */
-export const useNoteActions = createEntityActions<Note, CreateNoteInput>({
-  table: db.notes,
-  entityType: "note",
-  queryKeys: {
-    list: () => QUERY_KEYS.notesList(),
-    detail: (id) => QUERY_KEYS.notesDetail(id),
-  },
-  buildDefaults,
-});
+// Create
+const note = { id: crypto.randomUUID(), title: "New", content: "...", /* ... */ };
+await db.notes.put(note);
+afterMutation(note.id);
+
+// Update
+await db.notes.update(id, { title: "Renamed" });
+afterMutation(id);
+
+// Soft-delete
+await db.notes.update(id, { isDeleted: true, updatedAt: new Date().toISOString() });
+afterMutation(id);
+
+// Query — useLiveQuery or any Dexie API directly
+const notes = useLiveQuery(() =>
+  db.notes.where("folderId").equals(folderId).toArray()
+);
 ```
 
-**Backward-compatible mapping** — existing call sites see no change:
-
-| Old API | New (identical) |
-|---|---|
-| `const { createNote, saveNote, deleteNote, deleteNotes } = useNoteActions()` | `const { create, save, remove, removeMany } = useNoteActions()` — or alias locally |
-
-> **Migration strategy:** Keep old names via destructuring aliases at call sites if desired,
-> or rename in-place (search-and-replace safe). The return shape is structurally identical.
-
----
-
-### 3.3 Refactor: `src/hooks/useFolderActions.ts` → thin wrapper
-
-```typescript
-import { createEntityActions } from "@/lib/entity-actions";
-import { db } from "@/db/syncNotesDb";
-import { QUERY_KEYS } from "@/lib/query-keys";
-import type { Folder } from "@/types/Folder";
-
-type CreateFolderInput = Partial<Pick<Folder, "id" | "name" | "color">>;
-
-const buildDefaults = (input: CreateFolderInput): Folder => ({
-  id: input.id || crypto.randomUUID(),
-  name: input.name || "Untitled",
-  color: input.color || "#ffff",
-  isDeleted: false,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  deletedAt: null,
-});
-
-export const useFolderActions = createEntityActions<Folder, CreateFolderInput>({
-  table: db.folders,
-  entityType: "folder",
-  queryKeys: {
-    list: () => QUERY_KEYS.foldersList(),
-    detail: (id) => QUERY_KEYS.foldersDetail(id),
-  },
-  buildDefaults,
-});
-```
-
----
+> **Design philosophy:** Dexie is the source of truth for reads AND writes. Hooks handle
+> change-logging transparently. `useSyncActions` is a convenience, not a requirement — any
+> component can call `db.notes.put()` and the hooks will log it for sync; `afterMutation()`
+> just keeps React Query caches fresh and triggers an immediate sync attempt.
 
 ### 3.4 Adding a new entity type (example: "Tags")
 
-With the generic hook, adding a new synced entity takes **one new file**:
+With Dexie hooks, adding a new synced entity is trivial:
 
 ```typescript
-// src/hooks/useTagActions.ts
-import { createEntityActions } from "@/lib/entity-actions";
-import { db } from "@/db/syncNotesDb";    // ← db.tags added in Dexie schema
-import { QUERY_KEYS } from "@/lib/query-keys"; // ← QUERY_KEYS.tagsList() added
-import type { Tag } from "@/types/Tag";
-
-type CreateTagInput = Partial<Pick<Tag, "id" | "name" | "color">>;
-
-export const useTagActions = createEntityActions<Tag, CreateTagInput>({
-  table: db.tags,
-  entityType: "tag",         // ← also add "tag" to ChangeEntityType union
-  queryKeys: {
-    list: () => QUERY_KEYS.tagsList(),
-    detail: (id) => QUERY_KEYS.tagsDetail(id),
-  },
-  buildDefaults: (input) => ({
-    id: input.id || crypto.randomUUID(),
-    name: input.name || "New Tag",
-    color: input.color || "#cccccc",
-    isDeleted: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    deletedAt: null,
-  }),
+// 1. Add table to schema
+this.version(4).stores({
+  notes: "...",
+  folders: "...",
+  changes: "...",
+  tags: "id, name, updatedAt, isDeleted",
 });
+
+// 2. Register hooks — one line
+registerChangeHooks(this.tags, "tag");
+
+// 3. Use anywhere — no wrapper needed
+const tags = useLiveQuery(() => db.tags.toArray());
+await db.tags.put({ id: crypto.randomUUID(), name: "important", /* ... */ });
 ```
 
-That's it — the hook inherits `create`, `save`, `remove`, `removeMany` with full type safety and automatic change-logging.
+No factory, no wrapper hook, no copy-paste logic. The entity is immediately available
+for `where` queries, `useLiveQuery`, bulk operations — the full Dexie API.
 
-**Effort:** ~80 lines for `entity-actions.ts`, ~30 lines each for refactored wrappers (net reduction from ~100 lines of duplicated code). Low complexity.
+**Effort:** ~55 lines for hook registration + skip flag in `syncNotesDb.ts`, ~20 lines for
+the optional `useSyncActions.ts`. Replaces ~140 lines of factory + wrappers. Low complexity.
 
 ---
 
@@ -515,40 +481,118 @@ const onDelete = async (itemType: "folder" | "note", itemId: string) => {
 
 ---
 
-## Phase 5: Update Call Sites to New API Names
+## Phase 5: Update Call Sites to Use Direct Dexie + `afterMutation`
 
-The generic hook returns `{ create, save, remove, removeMany }`. Existing call sites use
-`{ createNote, saveNote, deleteNote, deleteNotes }` and `{ createFolder, saveFolder, deleteFolder }`.
+Existing call sites use `useNoteActions()` and `useFolderActions()` which return
+`createNote`, `saveNote`, `deleteNote`, `deleteNotes`, etc. With Dexie hooks handling
+change-logging automatically, we can remove these wrapper hooks entirely and use Dexie
+directly. The only remaining concern is React Query cache invalidation and sync triggering,
+which the optional `useSyncActions` hook handles.
 
-Two options (team's choice):
+### Migration pattern
 
-**Option A — Destructure with aliases (zero internal refactoring):**
+**Before (old):**
 ```typescript
-const { create: createNote, save: saveNote, remove: deleteNote, removeMany: deleteNotes } = useNoteActions();
-const { create: createFolder, save: saveFolder, remove: deleteFolder } = useFolderActions();
+const { createNote, saveNote, deleteNote, deleteNotes } = useNoteActions();
+const note = createNote({ title: "New" });
+await saveNote(note);
+await deleteNote(id);
 ```
-Pros: call sites unchanged. Cons: verbose destructuring at each usage point.
 
-**Option B — Rename in-place (search-and-replace):**
+**After (new):**
+```typescript
+const { afterMutation } = useSyncActions({
+  list: () => QUERY_KEYS.notesList(),
+  detail: (id) => QUERY_KEYS.notesDetail(id),
+});
+
+// Create — build defaults inline, put into Dexie
+const note: Note = {
+  id: crypto.randomUUID(),
+  title: "New",
+  folderId: null,
+  content: INITIAL_EDITOR_STATE,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  isDeleted: false,
+  deletedAt: null,
+};
+await db.notes.put(note);
+afterMutation(note.id);
+
+// Update
+await db.notes.update(id, { title: "Renamed" });
+afterMutation(id);
+
+// Soft-delete
+await db.notes.update(id, { isDeleted: true, updatedAt: new Date().toISOString() });
+afterMutation(id);
+
+// Batch soft-delete
+for (const id of ids) {
+  await db.notes.update(id, { isDeleted: true, updatedAt: new Date().toISOString() });
+}
+afterMutation(); // invalidate list only
 ```
-createNote  → create
-saveNote    → save
-deleteNote  → remove
-deleteNotes → removeMany
-createFolder → create
-saveFolder   → save
-deleteFolder → remove
+
+Change-logging for all these operations happens transparently via the Dexie hooks
+registered in Phase 3 — no `db.changes` calls needed at call sites.
+
+### Files affected
+
+- `src/routes/_auth/notes/index.tsx` — replace `useNoteActions` with direct Dexie + `useSyncActions`
+- `src/routes/_auth/notes/-components/AppSidebar.tsx` — replace `useNoteActions`/`useFolderActions`
+- `src/routes/_auth/notes/-components/noteId.tsx` — replace `useNoteActions`
+- `src/routes/_auth/notes/-components/NoteCard.tsx` — already fixed in Phase 4
+- `src/routes/_auth/notes/-components/FilterFloatingBar.tsx` — check if it uses action hooks
+
+### Optional: Keep thin wrappers for backward compat
+
+If the team prefers minimal diff, keep `useNoteActions.ts` and `useFolderActions.ts` as
+thin wrappers that delegate to direct Dexie internally (no factory, no generic abstraction):
+
+```typescript
+// src/hooks/useNoteActions.ts (thin wrapper — optional)
+import { db } from "@/db/syncNotesDb";
+import { useSyncActions } from "@/hooks/useSyncActions";
+import { QUERY_KEYS, INITIAL_EDITOR_STATE } from "@/lib/constants";
+import type { Note } from "@/types/Note";
+
+export function useNoteActions() {
+  const { afterMutation } = useSyncActions({
+    list: () => QUERY_KEYS.notesList(),
+    detail: (id) => QUERY_KEYS.notesDetail(id),
+  });
+
+  const createNote = (input: Partial<Note> = {}): Note => ({
+    id: input.id || crypto.randomUUID(),
+    title: input.title || "Untitled",
+    folderId: input.folderId || null,
+    content: input.content || INITIAL_EDITOR_STATE,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    isDeleted: false,
+    deletedAt: null,
+  } as Note);
+
+  const saveNote = async (note: Note) => {
+    await db.notes.put(note);
+    afterMutation(note.id);
+  };
+
+  const deleteNote = async (id: string) => {
+    await db.notes.update(id, { isDeleted: true, updatedAt: new Date().toISOString() });
+    afterMutation(id);
+  };
+
+  return { createNote, saveNote, deleteNote };
+}
 ```
-Pros: clean, consistent API. Cons: changes ~10 call sites across 5 files.
 
-**Files affected by Option B:**
-- `src/routes/_auth/notes/index.tsx` — `createNote`, `saveNote`
-- `src/routes/_auth/notes/-components/AppSidebar.tsx` — `createNote`, `saveNote`, `createFolder`, `saveFolder`
-- `src/routes/_auth/notes/-components/noteId.tsx` — `saveNote`
-- `src/routes/_auth/notes/-components/NoteCard.tsx` — `remove` (already fixed in Phase 4)
-- `src/routes/_auth/notes/-components/FilterFloatingBar.tsx` — (check if it uses action hooks)
+But this is entirely optional — the hooks auto-log, so call sites can also use `db.notes`
+directly if they need `where` queries, `useLiveQuery`, or other Dexie features.
 
-**Effort:** ~15 lines of search-and-replace, trivial.
+**Effort:** ~20 lines across 3–5 files. Trivial.
 
 ---
 
@@ -571,7 +615,7 @@ This is the core change. Replace timestamp-diffing with change-log reading.
 - Downstream processing remains: backend returns updated entities → `bulkPut`
 
 ```typescript
-import { db } from "@/db/syncNotesDb";
+import { db, skipChangeHooks, resumeChangeHooks } from "@/db/syncNotesDb";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
@@ -664,7 +708,9 @@ export function useGlobalSyncEngine() {
           .filter((f) => f.isDeleted)
           .map((f) => f.id);
         if (hardDeleteFolders.length > 0) {
+          skipChangeHooks();
           await db.folders.bulkDelete(hardDeleteFolders);
+          resumeChangeHooks();
         }
       }
 
@@ -678,7 +724,9 @@ export function useGlobalSyncEngine() {
           .filter((n) => n.isDeleted)
           .map((n) => n.id);
         if (hardDeleteNotes.length > 0) {
+          skipChangeHooks();
           await db.notes.bulkDelete(hardDeleteNotes);
+          resumeChangeHooks();
         }
       }
 
@@ -702,7 +750,7 @@ export function useGlobalSyncEngine() {
 - `lastSyncedAt` localStorage is no longer needed for correctness (can be removed or kept as a fallback).
 - Changes are sent in insertion order (`ORDER BY id`), preserving operation sequence.
 - Backend acknowledges specific change IDs → client marks them `synced: true`.
-- Downstream processing (receiving server updates) is unchanged.
+- Downstream `bulkDelete` calls are wrapped with `skipChangeHooks()`/`resumeChangeHooks()` to prevent the Dexie hooks from generating spurious delete change records for server-sent hard-deletes.
 
 ### 6.2 Modify: `src/types/response/SyncNoteResponse.ts`
 
@@ -766,27 +814,28 @@ This can be done in Phase 6 or later.
 |---|---|---|---|---|
 | 1 | `src/types/ChangeRecord.ts` | **CREATE** | ~15 | Trivial |
 | 2 | `src/db/syncNotesDb.ts` | MODIFY | ~8 | Low |
-| 3 | `src/lib/entity-actions.ts` | **CREATE** | ~80 | Medium |
-| 3 | `src/hooks/useNoteActions.ts` | REWRITE (thin wrapper) | ~30 | Low |
-| 3 | `src/hooks/useFolderActions.ts` | REWRITE (thin wrapper) | ~30 | Low |
+| 3 | `src/db/syncNotesDb.ts` | MODIFY (add hooks + skip flag) | ~55 | Low |
+| 3 | `src/hooks/useSyncActions.ts` | **CREATE** (optional) | ~20 | Low |
 | 4 | `src/routes/_auth/notes/-components/NoteCard.tsx` | MODIFY | ~5 | Low |
 | 4 | `src/routes/_auth/notes/-components/AppSidebar.tsx` | MODIFY | ~5 | Low |
-| 5 | Call-site renames (5 files) | MODIFY | ~15 | Trivial |
+| 5 | Call-site updates (3–5 files) | MODIFY | ~20 | Low |
 | 6 | `src/hooks/useSyncEngine.ts` | MODIFY | ~50 | **Medium-High** |
 | 6 | `src/types/response/SyncNoteResponse.ts` | MODIFY | ~3 | Trivial |
 | 7 | Cleanup (optional) | MODIFY | ~10 | Low |
 
-| | **Total** | **11–12 files** | **~251 lines** | |
+| | **Total** | **10–11 files** | **~233 lines** | |
 
-> **Net code reduction:** Phase 3 replaces ~120 lines of duplicated hook logic with ~80 lines of generic
-> factory + ~60 lines of thin wrappers. Adding a 3rd entity (tags, bookmarks) adds only ~25 lines vs.
-> ~40 lines of copy-paste.
+> **Net code reduction:** Phase 3 replaces ~140 lines of factory + wrapper hooks with ~55 lines of
+> hook registration + optional ~20 line helper. Adding a 3rd entity (tags, bookmarks) adds only
+> ~5 lines (one `registerChangeHooks` call + schema entry) vs. ~25 lines of factory config + wrapper.
+> Consumers also gain full access to Dexie's API: `useLiveQuery`, `where` clauses, `bulkPut`, etc.
 
 ### Files NOT touched (no changes needed)
 - `src/context/SyncContext.tsx` — interface unchanged
 - `src/components/SyncManager.tsx` — triggers `sync()`, doesn't care how sync works
-- `src/hooks/useNotes.ts` / `useFolders.ts` — queries stay the same
+- `src/hooks/useNotes.ts` / `useFolders.ts` — queries stay the same; can optionally switch to `useLiveQuery`
 - `src/hooks/useNoteDetail.ts` — reads from `db.notes`, unchanged
+- `src/hooks/useNoteActions.ts` / `useFolderActions.ts` — can be deleted or kept as thin wrappers (Phase 5)
 - `src/context/NotesContext.tsx` / `NotesViewContext.tsx` — no changes
 - `src/store/store.tsx` — no changes
 - `src/lib/api-client.ts` — no changes (endpoint stays `POST /notes/sync`)

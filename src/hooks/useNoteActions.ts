@@ -1,7 +1,7 @@
 import { db } from "@/db/syncNotesDb";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 import { QUERY_KEYS } from "@/lib/query-keys";
-import type { Note } from "@/types/Note";
+import type { Note } from "@/types/entities/Note";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSyncContext } from "@/context/SyncContext";
 

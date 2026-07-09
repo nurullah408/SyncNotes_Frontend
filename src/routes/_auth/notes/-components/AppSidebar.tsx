@@ -18,7 +18,7 @@ import {
   Plus,
   Trash,
 } from "lucide-react";
-import { useNoteActions } from "@/hooks/useNoteActions";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,20 +31,15 @@ import { buildFlatList } from "@/lib/sidebar-utils.ts";
 import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
 import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
-import { useFolderActions } from "@/hooks/useFolderActions.ts";
 import { useGlobalStore } from "@/store/store.tsx";
-import { useNotes } from "@/hooks/useNotes";
-import { useFolders } from "@/hooks/useFolders";
+import { db } from "@/db/syncNotesDb";
+import type { Folder } from "@/types/entities/Folder";
+import type { Note } from "@/types/entities/Note";
+import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const { data: notes, isLoading: isNotesLoading } = useNotes();
-  const { data: folders, isLoading: isFoldersLoading } = useFolders();
-
-  const { createNote, saveNote } = useNoteActions();
-  const { createFolder, saveFolder } = useFolderActions();
 
   const openModal = useGlobalStore((state) => state.openModal);
 
@@ -52,14 +47,25 @@ export function AppSidebar() {
     Record<string, boolean>
   >({});
 
-  const createNewFolder = async () => {
-    await saveFolder(
-      createFolder({
-        id: crypto.randomUUID(),
-        name: "Untitled",
-      }),
-    );
-  };
+  const notes:Note[] | undefined = useLiveQuery(
+    () => {
+      return db.notes.filter((n) => !n.isDeleted).toArray();
+    }
+  );
+
+  const folders:Folder[] | undefined = useLiveQuery(
+    () => {
+      return db.folders.filter((f) => !f.isDeleted).toArray();
+    }
+  )
+
+  const createNote = async (note: Note) => {
+    await db.notes.add({ ...note });
+  }
+
+  const createFolder = async (folder: Folder) => {
+    await db.folders.add({ ...folder });
+  }
 
   const toggleFolder = (folderId: string) => {
     setCollapsedFolders((prev) => ({
@@ -68,14 +74,36 @@ export function AppSidebar() {
     }));
   };
 
-  const createNewNote = async () => {
-    const note = createNote({
-      id: crypto.randomUUID(),
+  const onCreateNewNote = async () => {
+    const newNoteId = crypto.randomUUID();
+    const newNote: Note = {
+      id: newNoteId,
       title: "Untitled",
-    });
-    await saveNote(note);
-    navigate({ to: `/notes/${note.id}`, params: { noteId: note.id } });
+      content: INITIAL_EDITOR_STATE,
+      searchContent: "",
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+      folderId: null,
+      updatedAt: new Date().toISOString(),
+    };
+    await createNote(newNote);
+    navigate({ to: `/notes/$noteId`, params: { noteId: newNoteId } });
   };
+
+  const onCreateNewFolder = async () => {
+    const newFolderId = crypto.randomUUID();
+    const newFolder:Folder = {
+      id: newFolderId,
+      name: "Untitled",
+      color: "#ffff",
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+      updatedAt: new Date().toISOString(),
+    }
+    await createFolder(newFolder);
+  }
 
   const onDelete = async (itemType: "folder" | "note", itemId: string) => {
     if (itemType === "note") {
@@ -115,7 +143,7 @@ export function AppSidebar() {
     return buildFlatList(notes, folders, collapsedFolders);
   }, [notes, folders, collapsedFolders]);
 
-  const isLoading = isNotesLoading || isFoldersLoading;
+  const isLoading = !folders || !notes;
 
   return (
     <Sidebar>
@@ -126,7 +154,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2 mt-2">
         <div className="flex items-center gap-2">
           <Button
-            onClick={createNewNote}
+            onClick={onCreateNewNote}
             variant="outline"
             size="icon-sm"
             className="rounded-[10px]"
@@ -134,7 +162,7 @@ export function AppSidebar() {
             <Plus className="size-4" />
           </Button>
           <Button
-            onClick={createNewFolder}
+            onClick={onCreateNewFolder}
             variant="outline"
             size="icon-sm"
             className="rounded-[10px]"

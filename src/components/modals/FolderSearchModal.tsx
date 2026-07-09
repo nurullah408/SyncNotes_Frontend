@@ -1,7 +1,6 @@
 import { db } from "@/db/syncNotesDb";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
-import type { Folder } from "@/types/Folder";
-import { useQuery } from "@tanstack/react-query";
+import type { Folder } from "@/types/entities/Folder";
 import { useState, type ChangeEvent } from "react";
 import {
   Dialog,
@@ -12,7 +11,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Folder as FolderIcon } from "lucide-react";
-import { useNoteActions } from "@/hooks/useNoteActions";
+import { useLiveQuery } from "dexie-react-hooks";
 
 interface FolderSearchModalProps {
   noteId: string;
@@ -34,32 +33,27 @@ export function FolderSearchModal({
     debouncedSetSearch(event.currentTarget.value);
   };
 
-  const { saveNote } = useNoteActions();
-
   const onMoveToFolder = async ({
     noteId,
     folderId,
   }: {
     noteId: string;
     folderId: string;
-  }) => {
-    await saveNote({
-      id: noteId,
+    }) => {
+
+    await db.notes.update(noteId, {
       folderId,
-    });
+    })
     onClose();
   };
 
-  const { data: results, isLoading } = useQuery<Folder[]>({
-    queryFn: async () => {
-      const results = await db.folders
-        .where("name")
-        .startsWithAnyOfIgnoreCase(search)
-        .toArray();
-      return results;
-    },
-    queryKey: ["notes", "search", search],
-  });
+  const folders = useLiveQuery(
+    () => {
+      return db.folders.filter((f) => !f.isDeleted).toArray();
+    }
+  );
+
+  const isLoading = !folders;
 
   return (
     <Dialog
@@ -91,7 +85,7 @@ export function FolderSearchModal({
                     className="animate-pulse duration-500 w-full h-10"
                   />
                 ))
-              : results?.map((res, i) => (
+              : folders?.map((res, i) => (
                   <SearchResult
                     key={i}
                     {...res}
@@ -105,7 +99,7 @@ export function FolderSearchModal({
                 Type your query to get started
               </span>
             )}
-            {!isLoading && search.length !== 0 && results?.length === 0 && (
+            {!isLoading && search.length !== 0 && folders?.length === 0 && (
               <span className="text-center text-muted-foreground">
                 No results found
               </span>
