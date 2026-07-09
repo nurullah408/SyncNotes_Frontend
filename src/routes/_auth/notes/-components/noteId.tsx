@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/types/Note";
 import { useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, Cog, LoaderPinwheel, Search } from "lucide-react";
+import { Check, LoaderPinwheel, Search, Settings } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
 import { useNoteDetail } from "../../../../hooks/useNoteDetail.ts";
+import { useSyncContext } from "@/context/SyncContext";
 import {
   Popover,
   PopoverContent,
@@ -43,9 +43,9 @@ export function Note() {
 
   const { open } = useSidebar();
 
-  const { sync, isSyncing } = useGlobalSyncEngine();
+  const { isSyncing } = useSyncContext();
 
-  const { saveNote } = useNoteActions(sync);
+  const { saveNote } = useNoteActions();
 
   const noteData = useNoteDetail(params.noteId);
 
@@ -83,6 +83,17 @@ export function Note() {
     });
   }
 
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Don't steal focus from interactive elements or the editor itself
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        'input, button, [role="button"], [role="menuitem"], [contenteditable="true"]',
+      )
+    )
+      return;
+  };
+
   const title = note ? note.title : "Untitled";
   const content = note ? note.content : INITIAL_EDITOR_STATE;
 
@@ -96,7 +107,11 @@ export function Note() {
   }
 
   return (
-    <div key={params.noteId} className="px-4 pt-2 border rounded h-full w-full">
+    <div
+      key={params.noteId}
+      className="px-4 pt-2 border rounded h-full w-full"
+      onClick={handleContainerClick}
+    >
       <div className="flex gap-1 items-center justify-between">
         {/* Note header left side */}
         <div className="flex gap-1 items-center">
@@ -135,7 +150,7 @@ export function Note() {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size={"icon-xs"} className="rounded-lg">
-                <Cog className="size-4" />
+                <Settings className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="rounded-lg">

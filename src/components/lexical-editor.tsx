@@ -33,6 +33,7 @@ interface EditorProps {
   namespace?: string;
   className?: string;
   placeholderClassName?: string;
+  children?: React.ReactNode;
 }
 
 // Catch any errors that occur during Lexical updates and log them
@@ -48,6 +49,7 @@ export function Editor({
   onChange,
   className = "",
   placeholderClassName = "",
+  children,
 }: EditorProps) {
   const initialConfig = {
     namespace: namespace ?? "SyncNotesEditor",
@@ -89,6 +91,7 @@ export function Editor({
       <AutoFocusPlugin />
       <MarkdownShortcutPlugin transformers={CUSTOM_MARKDOWN_TRANSFORMERS} />
       <SlashMenuPlugin />
+      {children}
     </LexicalComposer>
   );
 }

@@ -3,4 +3,5 @@ export interface Entity {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  isDeleted: boolean;
 }

@@ -4,10 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 
 export function useNotes() {
   return useQuery({
-    queryKey: QUERY_KEYS.notesAll,
+    queryKey: QUERY_KEYS.notesList(),
     queryFn: async () => {
-      return db.notes.reverse().sortBy("lastUpdated");
+      return db.notes
+        .filter((n) => !n.isDeleted)
+        .reverse()
+        .sortBy("lastUpdated");
     },
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 }

@@ -1,3 +1,7 @@
+import { db } from "@/db/syncNotesDb";
+import { useDebouncedCallback } from "@/hooks/useDebounce";
+import type { Folder } from "@/types/Folder";
+import { useQuery } from "@tanstack/react-query";
 import { useState, type ChangeEvent } from "react";
 import {
   Dialog,
@@ -7,20 +11,18 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
-import { BASE_URL } from "@/constants";
-import type { ApiResponse } from "@/types/response/ApiResponse";
-import type { SearchNoteResult } from "@/types/NoteSearchResult";
-import { useNavigate } from "@tanstack/react-router";
-import { SanitizedHTMLMarkup } from "../sanitized-html-markup";
-import { useDebouncedCallback } from "@/hooks/useDebounce";
+import { Folder as FolderIcon } from "lucide-react";
+import { useNoteActions } from "@/hooks/useNoteActions";
 
-interface GlobalSearchModalProps {
+interface FolderSearchModalProps {
+  noteId: string;
   onClose: () => void;
 }
 
-export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
+export function FolderSearchModal({
+  noteId,
+  onClose,
+}: FolderSearchModalProps) {
   const [search, setSearch] = useState("");
 
   const debouncedSetSearch = useDebouncedCallback(
@@ -28,22 +30,33 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
     500,
   );
 
-  function onChangeSearch(event: ChangeEvent<HTMLInputElement>) {
+  const onChangeSearch = (event: ChangeEvent<HTMLInputElement>) => {
     debouncedSetSearch(event.currentTarget.value);
-  }
+  };
 
-  const { data: results, isLoading } = useQuery<
-    ApiResponse<SearchNoteResult[]>
-  >({
-    enabled: search.length > 0,
+  const { saveNote } = useNoteActions();
+
+  const onMoveToFolder = async ({
+    noteId,
+    folderId,
+  }: {
+    noteId: string;
+    folderId: string;
+  }) => {
+    await saveNote({
+      id: noteId,
+      folderId,
+    });
+    onClose();
+  };
+
+  const { data: results, isLoading } = useQuery<Folder[]>({
     queryFn: async () => {
-      const results = await apiClient(
-        `${BASE_URL}/notes/search?query=${encodeURIComponent(search)}`,
-        {
-          method: "GET",
-        },
-      );
-      return await results.json();
+      const results = await db.folders
+        .where("name")
+        .startsWithAnyOfIgnoreCase(search)
+        .toArray();
+      return results;
     },
     queryKey: ["notes", "search", search],
   });
@@ -78,21 +91,25 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
                     className="animate-pulse duration-500 w-full h-10"
                   />
                 ))
-              : results?.data?.map((res, i) => (
-                  <SearchResult key={i} {...res} onClose={onClose} />
+              : results?.map((res, i) => (
+                  <SearchResult
+                    key={i}
+                    {...res}
+                    onClick={() =>
+                      onMoveToFolder({ noteId, folderId: res.id })
+                    }
+                  />
                 ))}
             {!isLoading && search.length === 0 && (
               <span className="text-center text-muted-foreground">
                 Type your query to get started
               </span>
             )}
-            {!isLoading &&
-              search.length !== 0 &&
-              results?.data?.length === 0 && (
-                <span className="text-center text-muted-foreground">
-                  No results found
-                </span>
-              )}
+            {!isLoading && search.length !== 0 && results?.length === 0 && (
+              <span className="text-center text-muted-foreground">
+                No results found
+              </span>
+            )}
           </div>
         </DialogContent>
       </form>
@@ -101,34 +118,18 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
 }
 
 function SearchResult({
-  id,
-  title,
+  name,
   updatedAt,
-  searchContent,
-  onClose,
-}: SearchNoteResult & { onClose: () => void }) {
-  const navigate = useNavigate();
-  const onClick =
-   async () => {
-    onClose();
-    await navigate({
-      to: "/notes/$noteId",
-      params: {
-        noteId: id,
-      },
-    });
-  };
-
+  onClick,
+}: Folder & { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       aria-description="Note link"
       className="w-full grid text-left hover:bg-accent hover:cursor-pointer p-1 rounded-lg"
     >
-      <span className="text-lg font-bold">{title}</span>
-      <div>
-        <SanitizedHTMLMarkup snippet={searchContent + "..."} />
-      </div>
+      <FolderIcon className="size-4" />
+      <span className="text-lg font-bold">{name}</span>
       <p className="text-xs">
         Last Updated:{" "}
         <span className="italic">

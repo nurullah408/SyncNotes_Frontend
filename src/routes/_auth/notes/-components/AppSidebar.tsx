@@ -7,19 +7,18 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { INITIAL_EDITOR_STATE } from "@/lib/constants";
-import type { Note } from "@/types/Note";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Ellipsis,
   FileText,
   FolderClosed,
   FolderOpen,
+  FolderPlus,
+  Move,
   Plus,
   Trash,
 } from "lucide-react";
-import { useNoteActions } from "../../../../hooks/useNoteActions.ts";
-import { useGlobalSyncEngine } from "../../../../hooks/useSyncEngine.ts";
+import { useNoteActions } from "@/hooks/useNoteActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,53 +26,58 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/lib/utils.ts";
-import type { Folder } from "@/types/Folder.ts";
 import { useMemo, useState } from "react";
 import { buildFlatList } from "@/lib/sidebar-utils.ts";
 import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
 import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
+import { useFolderActions } from "@/hooks/useFolderActions.ts";
+import { useGlobalStore } from "@/store/store.tsx";
+import { useNotes } from "@/hooks/useNotes";
+import { useFolders } from "@/hooks/useFolders";
 
-interface AppSidebarProps {
-  notes: Note[] | undefined;
-  folders: Folder[] | undefined;
-  isLoading: boolean;
-}
-
-export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
+export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { sync } = useGlobalSyncEngine();
-  const { saveNote } = useNoteActions(sync);
+  const { data: notes, isLoading: isNotesLoading } = useNotes();
+  const { data: folders, isLoading: isFoldersLoading } = useFolders();
+
+  const { createNote, saveNote } = useNoteActions();
+  const { createFolder, saveFolder } = useFolderActions();
+
+  const openModal = useGlobalStore((state) => state.openModal);
 
   const [collapsedFolders, setCollapsedFolders] = useState<
     Record<string, boolean>
   >({});
 
-  const toggleFolder = (folderId: string) => {
-    setCollapsedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
+  const createNewFolder = async () => {
+    await saveFolder(
+      createFolder({
+        id: crypto.randomUUID(),
+        name: "Untitled",
+      }),
+    );
   };
 
-  const visibleItems = useMemo(() => {
-    if (!notes || !folders) return [];
-    return buildFlatList(notes, folders, collapsedFolders);
-  }, [notes, folders, collapsedFolders]);
+  const toggleFolder = (folderId: string) => {
+    setCollapsedFolders((prev) => ({
+      ...prev,
+      [folderId]: !prev[folderId],
+    }));
+  };
 
-  async function createNewNote() {
-    const newNoteId = crypto.randomUUID();
-    await saveNote({
-      id: newNoteId,
+  const createNewNote = async () => {
+    const note = createNote({
+      id: crypto.randomUUID(),
       title: "Untitled",
-      content: INITIAL_EDITOR_STATE,
-      searchContent: "",
-      updatedAt: new Date().toISOString(),
-      isDeleted: false,
     });
-    navigate({ to: `/notes/${newNoteId}`, params: { noteId: newNoteId } });
-  }
+    await saveNote(note);
+    navigate({ to: `/notes/${note.id}`, params: { noteId: note.id } });
+  };
 
-  async function onDelete(itemType: "folder" | "note", itemId: string) {
+  const onDelete = async (itemType: "folder" | "note", itemId: string) => {
     if (itemType === "note") {
       const active = location.pathname.includes(`/notes/${itemId}`);
       if (active) {
@@ -100,7 +104,18 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
     } else {
       return;
     }
-  }
+  };
+
+  const onMoveNote = (noteId: string) => {
+    openModal("MOVE_NOTE", { noteId });
+  };
+
+  const visibleItems = useMemo(() => {
+    if (!notes || !folders) return [];
+    return buildFlatList(notes, folders, collapsedFolders);
+  }, [notes, folders, collapsedFolders]);
+
+  const isLoading = isNotesLoading || isFoldersLoading;
 
   return (
     <Sidebar>
@@ -109,6 +124,24 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
         <SidebarTrigger className="rounded-[10px]" />
       </SidebarHeader>
       <SidebarContent className="px-2 mt-2">
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={createNewNote}
+            variant="outline"
+            size="icon-sm"
+            className="rounded-[10px]"
+          >
+            <Plus className="size-4" />
+          </Button>
+          <Button
+            onClick={createNewFolder}
+            variant="outline"
+            size="icon-sm"
+            className="rounded-[10px]"
+          >
+            <FolderPlus className="size-4" />
+          </Button>
+        </div>
         {isLoading
           ? Array.from({ length: 10 }).map((_, i) => (
               <SidebarMenuItem
@@ -117,30 +150,49 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
               />
             ))
           : visibleItems?.map((item: FlatListItem) => {
-              return item.type === "folder" ? (
-                <FolderRow
-                  key={`${item.type}-${item.id}`}
-                  folder={{ ...item }}
-                  isOpen={collapsedFolders[item.id]}
-                  onDelete={onDelete}
-                />
-              ) : (
-                <NoteRow
-                  key={`${item.type}-${item.id}`}
-                  note={{ ...item }}
-                  onDelete={onDelete}
-                />
-              );
+              if (item.type === "folder") {
+                const folderChildren = visibleItems.filter(
+                  (i) => i.type === "note" && i.folderId === item.id,
+                ) as NoteItem[];
+                return (
+                  <div key={item.id}>
+                    <FolderRow
+                      folder={{ ...item }}
+                      isOpen={!collapsedFolders[item.id]}
+                      onDelete={onDelete}
+                      onToggle={() => toggleFolder(item.id)}
+                    />
+                    <div
+                      className={cn(
+                        "overflow-hidden mt-2 transition-[max-height,opacity] duration-300 ease-in-out",
+                        collapsedFolders[item.id]
+                          ? "max-h-0 opacity-0"
+                          : "max-h-[100px] opacity-100",
+                      )}
+                    >
+                      {folderChildren.map((note: NoteItem) => (
+                        <NoteRow
+                          key={note.id}
+                          note={{ ...note }}
+                          onMoveNote={(noteId: string) => onMoveNote(noteId)}
+                          onDelete={onDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              if (!item.folderId) {
+                return (
+                  <NoteRow
+                    key={item.id}
+                    note={{ ...item }}
+                    onMoveNote={(noteId) => onMoveNote(noteId)}
+                    onDelete={onDelete}
+                  />
+                );
+              }
             })}
-        <SidebarMenuItem className="w-full flex justify-center rounded-[10px] overflow-hidden">
-          <Button
-            variant="ghost"
-            className="w-full rounded-lg"
-            onClick={createNewNote}
-          >
-            <Plus /> New Note
-          </Button>
-        </SidebarMenuItem>
       </SidebarContent>
     </Sidebar>
   );
@@ -149,12 +201,15 @@ export function AppSidebar({ notes, folders, isLoading }: AppSidebarProps) {
 function FolderRow({
   folder,
   isOpen,
+  onToggle,
   onDelete,
 }: {
   folder: FolderItem;
   isOpen: boolean;
+  onToggle: () => void;
   onDelete: (itemType: "folder", itemId: string) => Promise<void>;
 }) {
+  // Open = children visible. Collapsed in buildFlatList is the inverse.
   return (
     <SidebarMenuItem
       key={folder.id}
@@ -162,7 +217,24 @@ function FolderRow({
         "flex items-center w-full border rounded-[30px] relative overflow-hidden",
       )}
     >
-      {isOpen ? <FolderOpen /> : <FolderClosed />} {folder.name}
+      <SidebarMenuButton
+        asChild
+        className={cn("p-0 hover:bg-transparent hover:text-none")}
+        onClick={onToggle}
+      >
+        <div
+          className={cn(
+            "flex-6 py-0.5 pl-2 flex items-center gap-2 text-center rounded-l-[30px]",
+          )}
+        >
+          {isOpen ? (
+            <FolderOpen className="size-4" />
+          ) : (
+            <FolderClosed className="size-4" />
+          )}{" "}
+          {folder.name}
+        </div>
+      </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn("flex-1 rounded-r-[30px] pr-0 hover:bg-transparent")}
@@ -189,8 +261,10 @@ function FolderRow({
 function NoteRow({
   note,
   onDelete,
+  onMoveNote,
 }: {
   note: NoteItem;
+  onMoveNote: (noteId: string) => void;
   onDelete: (itemType: "note", itemId: string) => Promise<void>;
 }) {
   const location = useLocation();
@@ -201,9 +275,12 @@ function NoteRow({
     <SidebarMenuItem
       key={note.id}
       className={cn(
-        "flex items-center w-full border rounded-[30px] relative overflow-hidden",
+        "flex items-center border rounded-[30px] relative overflow-hidden pl-2",
         active ? "bg-primary text-white" : "",
       )}
+      style={{
+        marginLeft: `${note.depth * 16}px`,
+      }}
     >
       <SidebarMenuButton
         asChild
@@ -214,7 +291,7 @@ function NoteRow({
       >
         <Link
           className={cn(
-            "flex-6 py-0.5 pl-2 flex items-center gap-2 text-center rounded-l-[30px]",
+            "flex-6 py-0.5 flex items-center gap-2 text-center rounded-l-[30px]",
           )}
           to={`/notes/$noteId`}
           params={{ noteId: note.id }}
@@ -236,7 +313,21 @@ function NoteRow({
             className={cn("h-full size-4", active ? "text-white" : "")}
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={10} className="rounded-lg">
+        <DropdownMenuContent
+          align="start"
+          sideOffset={10}
+          className="flex flex-col gap-2 rounded-lg"
+        >
+          <DropdownMenuItem asChild>
+            <Button
+              variant={"outline"}
+              className="w-full rounded-sm"
+              onClick={() => onMoveNote(note.id)}
+            >
+              <Move className="size-4" />
+              Move Note
+            </Button>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Button
               variant={"destructive"}

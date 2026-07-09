@@ -15,8 +15,12 @@ export function buildFlatList(
 
   const rootNotes: Note[] = [];
 
+  // Build a set of existing folder IDs for fast lookup
+  const existingFolderIds = new Set(folders.map((f) => f.id));
+
   notes.forEach((note) => {
-    if (note.folderId) {
+    // Only group under folder if the folder actually exists
+    if (note.folderId && existingFolderIds.has(note.folderId)) {
       if (!notesByFolder.has(note.folderId))
         notesByFolder.set(note.folderId, []);
       notesByFolder.get(note.folderId)!.push(note);
@@ -33,16 +37,15 @@ export function buildFlatList(
       depth: 0,
       isCollapsed,
     });
-    if (!isCollapsed) {
-      const childNotes = notesByFolder.get(folder.id) || [];
-      childNotes.forEach((note) => {
-        result.push({
-          ...note,
-          type: "note",
-          depth: 1,
-        });
+    // Always include children — CSS handles collapse animation
+    const childNotes = notesByFolder.get(folder.id) || [];
+    childNotes.forEach((note) => {
+      result.push({
+        ...note,
+        type: "note",
+        depth: 1,
       });
-    }
+    });
   });
 
   rootNotes.forEach((note) => {

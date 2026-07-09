@@ -1,6 +1,5 @@
 import type z from "zod";
 import { loginSchema } from "../-schema/schema";
-import { useGlobalStore } from "@/store/store";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
@@ -28,8 +27,6 @@ import IconV1 from "@/assets/variant-1.svg?react";
 type ZFormValues = z.infer<typeof loginSchema>;
 
 export function Login() {
-  const setUser = useGlobalStore((state) => state.setUser);
-
   const router = useRouter();
 
   const loginMutation = useMutation({
@@ -50,8 +47,7 @@ export function Login() {
       }
       return result.json();
     },
-    onSuccess: async (result) => {
-      setUser(result.data);
+    onSuccess: async () => {
       await router.invalidate();
       await router.navigate({
         to: "/notes",
