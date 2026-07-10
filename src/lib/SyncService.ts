@@ -108,21 +108,30 @@ export class SyncService {
     let lastSyncedAt = raw ? new Date(JSON.parse(raw)) : new Date(0);
 
     // Drain unsent change records in batches of 200.
-    // Each batch may trigger paginated downstream data from the server.
+    // Uses table-scan (filter) instead of where() to avoid
+    // IDBKeyRange errors on the synced index.
+    let offset = 0;
+    let didSend = false;
     while (true) {
-      const unsent = await db.changeRecords
-        .where("synced")
-        .equals(false)
+      const page = await db.changeRecords
+        .offset(offset)
         .limit(200)
         .toArray();
+      const unsent = page.filter((r) => r.synced === false);
+      offset += page.length;
 
-      // Always send at least one request, even with zero changes,
-      // so new devices get full downstream data.
+      // Stop once we've sent something AND there are no more records
+      if (page.length === 0) {
+        if (didSend) break;
+        // Empty DB but no request sent yet — fall through to initial sync
+      }
+
       let result = await this.sendAndApply(
         unsent,
         lastSyncedAt,
         null, // first page — no cursor
       );
+      didSend = true;
 
       // Paginate through remaining downstream pages
       let cursor = result.nextCursor;
@@ -138,8 +147,8 @@ export class SyncService {
         JSON.stringify(result.serverTime),
       );
 
-      // No more unsent changes? Nothing left to do.
-      if (unsent.length === 0) break;
+      // No more records at all — done
+      if (page.length === 0) break;
     }
   }
 
@@ -183,7 +192,15 @@ export class SyncService {
 
     // Clean up processed change records
     if (data.processedChangeIds.length > 0) {
-      await db.changeRecords.bulkDelete(data.processedChangeIds);
+      try {
+        await db.changeRecords.bulkDelete(data.processedChangeIds);
+      } catch (err) {
+        console.error("[SyncService] bulkDelete changeRecords failed", {
+          ids: data.processedChangeIds,
+          err,
+        });
+        throw err;
+      }
     }
 
     // Write downstream entities to IndexedDB
@@ -209,7 +226,16 @@ export class SyncService {
               ? new Date(f.deletedAt).toISOString()
               : null,
           }));
-          await db.folders.bulkPut(folders);
+          try {
+            await db.folders.bulkPut(folders);
+          } catch (err) {
+            console.error("[SyncService] bulkPut folders failed", {
+              count: folders.length,
+              first: folders[0],
+              err,
+            });
+            throw err;
+          }
           const toDelete = folders
             .filter((f) => f.isDeleted)
             .map((f) => f.id);
@@ -219,6 +245,13 @@ export class SyncService {
         if (data.notes.length > 0) {
           const notes = data.notes.map((n) => ({
             ...n,
+            // Server returns content as a parsed JSON object, but IndexedDB
+            // stores it as a string. Normalize to avoid spurious change
+            // detection in useLiveQuery that resets the editor cursor.
+            content:
+              typeof n.content === "string"
+                ? n.content
+                : JSON.stringify(n.content),
             updatedAt: new Date(n.updatedAt).toISOString(),
             createdAt: n.createdAt
               ? new Date(n.createdAt as string).toISOString()
@@ -227,7 +260,16 @@ export class SyncService {
               ? new Date(n.deletedAt as string).toISOString()
               : null,
           }));
-          await db.notes.bulkPut(notes);
+          try {
+            await db.notes.bulkPut(notes);
+          } catch (err) {
+            console.error("[SyncService] bulkPut notes failed", {
+              count: notes.length,
+              first: notes[0],
+              err,
+            });
+            throw err;
+          }
           const toDelete = notes
             .filter((n) => n.isDeleted)
             .map((n) => n.id);
