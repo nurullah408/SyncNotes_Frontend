@@ -6,23 +6,16 @@ The sync engine uses a **change-record-based** protocol. Every local mutation (c
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant App as React App
-    participant MW as DBCore Middleware
-    participant IDB as IndexedDB
+    participant Client
+    participant Dexie as Dexie (IndexedDB)
     participant SS as SyncService
-    participant API as POST /notes/sync/changes
-    participant BE as NestJS Backend
-    participant DB as PostgreSQL
+    participant API as Backend
 
     %% ── Local mutation ──
-    User->>App: types in note title
-    App->>IDB: db.notes.update(id, { title: "new" })
-    IDB->>MW: mutate(req) — DBCore intercept
-    MW->>IDB: downTable.mutate(req) — execute actual write
-    MW->>MW: buildRecord(entityType, id, "update", { title: "new" })
-    MW->>IDB: changeRecords.bulkAdd([record])
-    MW-->>SS: onChangeHandler() — notify
+    Note over Client: user types in note title
+    Client->>Dexie: db.notes.update(id, { title: "new" })
+    Note over Dexie: DBCore middleware intercepts<br/>writes actual mutation + ChangeRecord
+    Dexie-->>SS: onChangeHandler() — local change detected
 
     %% ── Sync scheduling ──
     SS->>SS: scheduleSync() — debounce 2s
@@ -30,29 +23,17 @@ sequenceDiagram
 
     %% ── Drain loop ──
     loop until no unsent records
-        SS->>IDB: changeRecords.where("synced").equals(false).limit(200)
-        IDB-->>SS: [record1, record2, ...]
+        SS->>Dexie: changeRecords.where("synced").equals(false).limit(200)
+        Dexie-->>SS: [record1, record2, ...]
 
-        SS->>API: POST { changes: [...], lastSyncedAt, cursor }
-        API->>BE: SyncService.processSyncChanges()
-
-        %% ── Backend processing ──
-        BE->>DB: $transaction — apply each ChangeRecord
-        Note over BE,DB: create → INSERT<br/>update → UPDATE<br/>delete → SET isDeleted=true, deletedAt=now
-
-        BE->>DB: fetchDownstreamFolders(updatedAt > lastSyncedAt)
-        BE->>DB: fetchDownstreamNotes(updatedAt > lastSyncedAt, cursor pagination)
-        DB-->>BE: folders[], notes[], hasMore, nextCursor
-
-        BE-->>API: { processedChangeIds, folders, notes, hasMore, nextCursor, serverTime }
-        API-->>SS: response
+        SS->>API: POST /notes/sync/changes<br/>{ changes, lastSyncedAt, cursor }
+        Note over API: $transaction — apply each ChangeRecord<br/>fetchDownstream (cursor-paginated)
+        API-->>SS: { processedChangeIds, folders, notes,<br/>hasMore, nextCursor, serverTime }
 
         %% ── Apply results ──
-        SS->>IDB: changeRecords.bulkDelete(processedChangeIds)
-        SS->>SS: skipChangeTracking() — prevent feedback loop
-        SS->>IDB: folders.bulkPut(...) + notes.bulkPut(...)
-        SS->>IDB: bulkDelete(isDeleted entities)
-        SS->>SS: resumeChangeTracking()
+        SS->>Dexie: changeRecords.bulkDelete(processedChangeIds)
+        SS->>Dexie: skipChangeTracking() → bulkPut folders + notes
+        Note over SS,Dexie: skipChangeTracking prevents<br/>feedback loop of new ChangeRecords
 
         %% ── Downstream pagination ──
         opt hasMore
@@ -63,8 +44,7 @@ sequenceDiagram
     SS->>SS: checkpoint serverTime → localStorage
 
     %% ── UI updates ──
-    IDB-->>App: useLiveQuery detects changes
-    App-->>User: UI reflects synced state
+    Dexie-->>Client: useLiveQuery detects changes → UI re-renders
 ```
 
 ### Key design decisions
