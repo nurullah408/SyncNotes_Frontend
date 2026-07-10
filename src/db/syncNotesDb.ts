@@ -15,6 +15,7 @@ import Dexie, {
 // data that was already synced / received from the server.
 // ---------------------------------------------------------------------------
 let __skipChangeTracking = false;
+let __onChangeHandler: (() => void) | null = null;
 
 export function skipChangeTracking() {
   __skipChangeTracking = true;
@@ -22,6 +23,11 @@ export function skipChangeTracking() {
 
 export function resumeChangeTracking() {
   __skipChangeTracking = false;
+}
+
+/** Called by SyncService to register for change notifications. */
+export function setChangeHandler(handler: (() => void) | null) {
+  __onChangeHandler = handler;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +146,14 @@ function createChangeTrackerMiddleware(): Middleware<DBCore> {
                 }
               }
 
-              // 4. Persist change records (separate implicit transaction)
+              // 4. Persist change records, then notify sync service
               if (changes.length > 0) {
                 Dexie.ignoreTransaction(() => {
-                  db.changeRecords.bulkAdd(changes).catch(console.error);
-                })
+                  db.changeRecords
+                    .bulkAdd(changes)
+                    .then(() => __onChangeHandler?.())
+                    .catch(console.error);
+                });
               }
 
               return result;

@@ -20,6 +20,7 @@ export default defineConfig([
     },
     rules: {
       "react-refresh/only-export-components": "off",
+      "allExceptWhileTrue" : "on",
     },
   },
 ]);
