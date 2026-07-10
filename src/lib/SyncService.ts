@@ -107,7 +107,8 @@ export class SyncService {
     const raw = localStorage.getItem(LOCAL_STORAGE_SYNC_KEY);
     let lastSyncedAt = raw ? new Date(JSON.parse(raw)) : new Date(0);
 
-    // Drain unsynced change records in batches of 200
+    // Drain unsent change records in batches of 200.
+    // Each batch may trigger paginated downstream data from the server.
     while (true) {
       const unsent = await db.changeRecords
         .where("synced")
@@ -115,51 +116,80 @@ export class SyncService {
         .limit(200)
         .toArray();
 
-      if (unsent.length === 0) break;
-
-      const response = await apiClient(
-        `${BASE_URL}/notes/sync/changes`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            changes: unsent.map((c) => ({
-              id: c.id,
-              changeOperation: c.changeOperation,
-              changeEntityType: c.changeEntityType,
-              entityId: c.entityId,
-              payload: c.payload,
-              timestamp: c.timestamp,
-            })),
-            lastSyncedAt,
-          }),
-        },
+      // Always send at least one request, even with zero changes,
+      // so new devices get full downstream data.
+      let result = await this.sendAndApply(
+        unsent,
+        lastSyncedAt,
+        null, // first page — no cursor
       );
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+      // Paginate through remaining downstream pages
+      let cursor = result.nextCursor;
+      while (result.hasMore && cursor) {
+        result = await this.sendAndApply([], lastSyncedAt, cursor);
+        cursor = result.nextCursor;
       }
 
-      const json = (await response.json()) as {
-        status: number;
-        data: SyncChangesResponse;
-        message: string;
-      };
-      const { data } = json;
-
-      // Delete processed records and advance checkpoint
-      if (data.processedChangeIds.length > 0) {
-        await db.changeRecords.bulkDelete(data.processedChangeIds);
-      }
-
-      await this.applyDownstream(data);
-
-      // Advance checkpoint so next batch doesn't re-fetch the same downstream
-      lastSyncedAt = new Date(data.serverTime);
+      // All downstream pages consumed — checkpoint the server time
+      lastSyncedAt = new Date(result.serverTime);
       localStorage.setItem(
         LOCAL_STORAGE_SYNC_KEY,
-        JSON.stringify(data.serverTime),
+        JSON.stringify(result.serverTime),
       );
+
+      // No more unsent changes? Nothing left to do.
+      if (unsent.length === 0) break;
     }
+  }
+
+  /**
+   * Send a batch of changes (may be empty) and apply the server response.
+   * Returns the response data so the caller can inspect hasMore / nextCursor.
+   */
+  private async sendAndApply(
+    changes: ChangeRecord[],
+    lastSyncedAt: Date,
+    cursor: string | null,
+  ): Promise<SyncChangesResponse> {
+    const body: Record<string, unknown> = {
+      changes: changes.map((c) => ({
+        id: c.id,
+        changeOperation: c.changeOperation,
+        changeEntityType: c.changeEntityType,
+        entityId: c.entityId,
+        payload: c.payload,
+        timestamp: c.timestamp,
+      })),
+      lastSyncedAt,
+    };
+    if (cursor) body.cursor = cursor;
+
+    const response = await apiClient(
+      `${BASE_URL}/notes/sync/changes`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
+    }
+
+    const json = (await response.json()) as {
+      status: number;
+      data: SyncChangesResponse;
+      message: string;
+    };
+    const { data } = json;
+
+    // Clean up processed change records
+    if (data.processedChangeIds.length > 0) {
+      await db.changeRecords.bulkDelete(data.processedChangeIds);
+    }
+
+    // Write downstream entities to IndexedDB
+    await this.applyDownstream(data);
+
+    return data;
   }
 
   private async applyDownstream(data: SyncChangesResponse): Promise<void> {
