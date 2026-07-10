@@ -3,14 +3,14 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 
 export function InitializePlugin({ json }: { json: string | null }) {
   const [editor] = useLexicalComposerContext();
-  const isFirstRender = useRef(true);
+  const lastJsonRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only run the on receiving valid JSON
-    if (json && isFirstRender.current) {
+    // Only update the editor when json actually changes
+    if (json && json !== lastJsonRef.current) {
       const editorState = editor.parseEditorState(json);
       editor.setEditorState(editorState);
-      isFirstRender.current = false;
+      lastJsonRef.current = json;
     }
   }, [json, editor]);
 

@@ -1,14 +1,14 @@
 import { useLocalStorage } from "./useLocalStorage.ts";
 import { INITIAL_EDITOR_STATE, LOCAL_STORAGE_SYNC_KEY } from "@/lib/constants";
-import { db } from "@/db/syncNotesDb";
+import { db, skipChangeTracking, resumeChangeTracking } from "@/db/syncNotesDb";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Note } from "@/types/Note";
+import type { Note } from "@/types/entities/Note";
 import { BASE_URL } from "@/constants";
 import { apiClient } from "@/lib/api-client";
 import type { SyncNoteResponse } from "@/types/response/SyncNoteResponse";
 import { QUERY_KEYS } from "@/lib/query-keys";
-import type { Folder } from "@/types/Folder.ts";
+import type { Folder } from "@/types/entities/Folder.ts";
 
 export function useGlobalSyncEngine() {
   const queryClient = useQueryClient();
@@ -116,68 +116,74 @@ export function useGlobalSyncEngine() {
       message: string;
     };
 
-    await db.transaction("rw", [db.notes, db.folders], async () => {
-      if (foldersToUpload.length > 0) {
-        await Promise.all(
-          foldersToUpload.map(async (folder) => {
-            if (
-              folder.isDeleted &&
-              data.processedFolderIds.includes(folder.id)
-            ) {
-              await db.folders.delete(folder.id);
-            }
-          }),
-        );
-      }
-      if (notesToUpload.length > 0) {
-        await Promise.all(
-          notesToUpload.map(async (note) => {
-            if (note.isDeleted && data.processedNoteIds.includes(note.id)) {
-              await db.notes.delete(note.id);
-            }
-          }),
-        );
-      }
-
-      // Downstream Processing
-      if (data.folders.length > 0) {
-        const downstreamFolders = data.folders.map((f) => ({
-          ...f,
-          updatedAt: new Date(f.updatedAt).toString(),
-        }));
-        await db.folders.bulkPut(downstreamFolders);
-        const hardDeleteFolders = downstreamFolders
-          .filter((f) => f.isDeleted)
-          .map((f) => f.id);
-        if (hardDeleteFolders.length > 0) {
-          await db.folders.bulkDelete(hardDeleteFolders);
+    // Skip change tracking during sync — we're syncing existing changes, not creating new ones
+    skipChangeTracking();
+    try {
+      await db.transaction("rw", [db.notes, db.folders], async () => {
+        if (foldersToUpload.length > 0) {
+          await Promise.all(
+            foldersToUpload.map(async (folder) => {
+              if (
+                folder.isDeleted &&
+                data.processedFolderIds.includes(folder.id)
+              ) {
+                await db.folders.delete(folder.id);
+              }
+            }),
+          );
         }
-      }
-
-      if (data.notes.length > 0) {
-        const downstreamNotes = data.notes.map((n) => ({
-          ...n,
-          updatedAt: new Date(n.updatedAt).toString(),
-        }));
-        await db.notes.bulkPut(downstreamNotes);
-        const hardDeleteNotes = downstreamNotes
-          .filter((n) => n.isDeleted)
-          .map((n) => n.id);
-        if (hardDeleteNotes.length > 0) {
-          await db.notes.bulkDelete(hardDeleteNotes);
+        if (notesToUpload.length > 0) {
+          await Promise.all(
+            notesToUpload.map(async (note) => {
+              if (note.isDeleted && data.processedNoteIds.includes(note.id)) {
+                await db.notes.delete(note.id);
+              }
+            }),
+          );
         }
-      }
 
-      setLastSyncedAt(new Date(data.serverTime));
-      if (data.hasMore) {
-        await executePaginatedSync({
-          foldersToUpload: [],
-          notesToUpload: [],
-          lastSyncedAt,
-          cursor: data.nextCursor,
-        });
-      }
-    });
+        // Downstream Processing
+        if (data.folders.length > 0) {
+          const downstreamFolders = data.folders.map((f) => ({
+            ...f,
+            updatedAt: new Date(f.updatedAt).toString(),
+          }));
+          await db.folders.bulkPut(downstreamFolders);
+          const hardDeleteFolders = downstreamFolders
+            .filter((f) => f.isDeleted)
+            .map((f) => f.id);
+          if (hardDeleteFolders.length > 0) {
+            await db.folders.bulkDelete(hardDeleteFolders);
+          }
+        }
+
+        if (data.notes.length > 0) {
+          const downstreamNotes = data.notes.map((n) => ({
+            ...n,
+            updatedAt: new Date(n.updatedAt).toString(),
+          }));
+          await db.notes.bulkPut(downstreamNotes);
+          const hardDeleteNotes = downstreamNotes
+            .filter((n) => n.isDeleted)
+            .map((n) => n.id);
+          if (hardDeleteNotes.length > 0) {
+            await db.notes.bulkDelete(hardDeleteNotes);
+          }
+        }
+
+        setLastSyncedAt(new Date(data.serverTime));
+        if (data.hasMore) {
+          await executePaginatedSync({
+            foldersToUpload: [],
+            notesToUpload: [],
+            lastSyncedAt,
+            cursor: data.nextCursor,
+          });
+        }
+      });
+    } finally {
+      resumeChangeTracking();
+    }
   }
 
   return {
