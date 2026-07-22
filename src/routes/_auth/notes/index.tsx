@@ -10,7 +10,9 @@ import { FilePlus, LogOut, Plus, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
 import { Button } from "@/components/ui/button";
-import { useNoteActions } from "@/hooks/useNoteActions";
+import { db } from "@/db/syncNotesDb";
+import type { Note } from "@/types/entities/Note";
+import { INITIAL_EDITOR_STATE } from "@/lib/constants";
 
 export const Route = createFileRoute("/_auth/notes/")({
   component: Index,
@@ -20,12 +22,25 @@ function Index() {
   const queryClient = useQueryClient();
   const navigate = Route.useNavigate();
 
-  const { createNote, saveNote } = useNoteActions();
+  const createNote = async (note: Note) => {
+    await db.notes.add({ ...note });
+  }
 
-  async function createNewNote() {
-    const note = createNote({ title: "Untitled" });
-    await saveNote(note);
-    navigate({ to: `/notes/${note.id}`, params: { noteId: note.id } });
+  const onCreateNewNote = async () => {
+    const newNoteId = crypto.randomUUID();
+    const newNote: Note = {
+      id: newNoteId,
+      title: "Untitled",
+      content: INITIAL_EDITOR_STATE,
+      searchContent: "",
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+      folderId: null,
+      updatedAt: new Date().toISOString(),
+    };
+    await createNote(newNote);
+    navigate({ to: `/notes/$noteId`, params: { noteId: newNoteId } });
   }
 
   async function handleLogout() {
@@ -86,7 +101,7 @@ function Index() {
         </p>
 
         <Button
-          onClick={createNewNote}
+          onClick={onCreateNewNote}
           className="gap-2 rounded-xl px-5 h-11 shadow-sm font-medium"
         >
           <Plus className="size-4" /> Create Fresh Note

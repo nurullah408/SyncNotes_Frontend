@@ -1,18 +1,18 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { useGlobalSyncEngine } from "@/hooks/useSyncEngine";
+import { useSync } from "@/hooks/useSync";
 
 interface SyncContextValue {
-  sync: ReturnType<typeof useGlobalSyncEngine>["sync"];
-  isSyncing: ReturnType<typeof useGlobalSyncEngine>["isSyncing"];
+  sync: () => void;
+  isSyncing: boolean;
 }
 
 const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
-  const { sync, isSyncing } = useGlobalSyncEngine();
+  const { triggerSync, isSyncing } = useSync();
 
   return (
-    <SyncContext.Provider value={{ sync, isSyncing }}>
+    <SyncContext.Provider value={{ sync: triggerSync, isSyncing }}>
       {children}
     </SyncContext.Provider>
   );

@@ -1,33 +1,44 @@
 import { useEffect, useRef } from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useWindowVisibility } from "@/hooks/useWindowVisibility";
-import { useSyncContext } from "@/context/SyncContext";
+import { syncService } from "@/lib/SyncService";
 
+/**
+ * Starts/stops the SyncService and triggers sync on online / visibility events.
+ * Renders nothing — pure side-effects.
+ */
 export function SyncManager() {
-  const { sync } = useSyncContext();
   const hasInitiallySynced = useRef(false);
-
   const isOnline = useOnlineStatus();
   const isVisible = useWindowVisibility();
 
+  // Start the service when the component mounts
+  useEffect(() => {
+    syncService.start();
+    return () => syncService.stop();
+  }, []);
+
+  // Initial sync on mount
   useEffect(() => {
     if (!hasInitiallySynced.current) {
-      sync();
       hasInitiallySynced.current = true;
+      syncService.triggerSync();
     }
-  }, [sync]);
+  }, []);
 
+  // Sync when coming back online
   useEffect(() => {
     if (isOnline) {
-      sync();
+      syncService.triggerSync();
     }
-  }, [isOnline, sync]);
+  }, [isOnline]);
 
+  // Sync when tab becomes visible
   useEffect(() => {
     if (isVisible) {
-      sync();
+      syncService.triggerSync();
     }
-  }, [isVisible, sync]);
+  }, [isVisible]);
 
   return null;
 }

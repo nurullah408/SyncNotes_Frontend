@@ -3,63 +3,70 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  Ellipsis,
-  FileText,
-  FolderClosed,
-  FolderOpen,
   FolderPlus,
-  Move,
   Plus,
-  Trash,
 } from "lucide-react";
-import { useNoteActions } from "@/hooks/useNoteActions";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
+import { useLiveQuery } from "dexie-react-hooks";
 import { cn } from "@/lib/utils.ts";
 import { useMemo, useState } from "react";
 import { buildFlatList } from "@/lib/sidebar-utils.ts";
 import type { FlatListItem } from "@/types/util-types/FlatListItem.ts";
-import type { FolderItem } from "@/types/util-types/FolderItem.ts";
 import type { NoteItem } from "@/types/util-types/NoteItem.ts";
-import { useFolderActions } from "@/hooks/useFolderActions.ts";
 import { useGlobalStore } from "@/store/store.tsx";
-import { useNotes } from "@/hooks/useNotes";
-import { useFolders } from "@/hooks/useFolders";
+import { db } from "@/db/syncNotesDb";
+import type { Folder } from "@/types/entities/Folder";
+import type { Note } from "@/types/entities/Note";
+import { INITIAL_EDITOR_STATE } from "@/lib/constants";
+import { FolderRow } from "./FolderRow";
+import { NoteRow } from "./NoteRow";
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { data: notes, isLoading: isNotesLoading } = useNotes();
-  const { data: folders, isLoading: isFoldersLoading } = useFolders();
-
-  const { createNote, saveNote } = useNoteActions();
-  const { createFolder, saveFolder } = useFolderActions();
-
   const openModal = useGlobalStore((state) => state.openModal);
 
   const [collapsedFolders, setCollapsedFolders] = useState<
     Record<string, boolean>
-  >({});
+    >({});
 
-  const createNewFolder = async () => {
-    await saveFolder(
-      createFolder({
-        id: crypto.randomUUID(),
-        name: "Untitled",
-      }),
-    );
-  };
+  const [editingFolders, setEditingFolders] = useState<Set<string>>(new Set());
+
+  const notes:Note[] | undefined = useLiveQuery(
+    () => {
+      return db.notes.filter((n) => !n.isDeleted).toArray();
+    }
+  );
+
+  const folders:Folder[] | undefined = useLiveQuery(
+    () => {
+      return db.folders.filter((f) => !f.isDeleted).toArray();
+    }
+  )
+
+  const saveNote = async (note: Partial<Note> & { id: string }) => {
+    await db.notes.update(note.id, {
+      ...note,
+    });
+  }
+
+  const createNote = async (note: Note) => {
+    await db.notes.add({ ...note });
+  }
+
+  const createFolder = async (folder: Folder) => {
+    await db.folders.add({ ...folder });
+    setEditingFolders((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(folder.id)
+      return newSet;
+    });
+  }
 
   const toggleFolder = (folderId: string) => {
     setCollapsedFolders((prev) => ({
@@ -68,14 +75,36 @@ export function AppSidebar() {
     }));
   };
 
-  const createNewNote = async () => {
-    const note = createNote({
-      id: crypto.randomUUID(),
+  const onCreateNewNote = async () => {
+    const newNoteId = crypto.randomUUID();
+    const newNote: Note = {
+      id: newNoteId,
       title: "Untitled",
-    });
-    await saveNote(note);
-    navigate({ to: `/notes/${note.id}`, params: { noteId: note.id } });
+      content: INITIAL_EDITOR_STATE,
+      searchContent: "",
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+      folderId: null,
+      updatedAt: new Date().toISOString(),
+    };
+    await createNote(newNote);
+    navigate({ to: `/notes/$noteId`, params: { noteId: newNoteId } });
   };
+
+  const onCreateNewFolder = async () => {
+    const newFolderId = crypto.randomUUID();
+    const newFolder:Folder = {
+      id: newFolderId,
+      name: "Untitled",
+      color: "#ffff",
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+      updatedAt: new Date().toISOString(),
+    }
+    await createFolder(newFolder);
+  }
 
   const onDelete = async (itemType: "folder" | "note", itemId: string) => {
     if (itemType === "note") {
@@ -115,7 +144,7 @@ export function AppSidebar() {
     return buildFlatList(notes, folders, collapsedFolders);
   }, [notes, folders, collapsedFolders]);
 
-  const isLoading = isNotesLoading || isFoldersLoading;
+  const isLoading = !folders || !notes;
 
   return (
     <Sidebar>
@@ -126,7 +155,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2 mt-2">
         <div className="flex items-center gap-2">
           <Button
-            onClick={createNewNote}
+            onClick={onCreateNewNote}
             variant="outline"
             size="icon-sm"
             className="rounded-[10px]"
@@ -134,7 +163,7 @@ export function AppSidebar() {
             <Plus className="size-4" />
           </Button>
           <Button
-            onClick={createNewFolder}
+            onClick={onCreateNewFolder}
             variant="outline"
             size="icon-sm"
             className="rounded-[10px]"
@@ -160,6 +189,8 @@ export function AppSidebar() {
                       folder={{ ...item }}
                       isOpen={!collapsedFolders[item.id]}
                       onDelete={onDelete}
+                      editing={editingFolders.has(item.id)}
+                      setEditing={setEditingFolders}
                       onToggle={() => toggleFolder(item.id)}
                     />
                     <div
@@ -195,151 +226,5 @@ export function AppSidebar() {
             })}
       </SidebarContent>
     </Sidebar>
-  );
-}
-
-function FolderRow({
-  folder,
-  isOpen,
-  onToggle,
-  onDelete,
-}: {
-  folder: FolderItem;
-  isOpen: boolean;
-  onToggle: () => void;
-  onDelete: (itemType: "folder", itemId: string) => Promise<void>;
-}) {
-  // Open = children visible. Collapsed in buildFlatList is the inverse.
-  return (
-    <SidebarMenuItem
-      key={folder.id}
-      className={cn(
-        "flex items-center w-full border rounded-[30px] relative overflow-hidden",
-      )}
-    >
-      <SidebarMenuButton
-        asChild
-        className={cn("p-0 hover:bg-transparent hover:text-none")}
-        onClick={onToggle}
-      >
-        <div
-          className={cn(
-            "flex-6 py-0.5 pl-2 flex items-center gap-2 text-center rounded-l-[30px]",
-          )}
-        >
-          {isOpen ? (
-            <FolderOpen className="size-4" />
-          ) : (
-            <FolderClosed className="size-4" />
-          )}{" "}
-          {folder.name}
-        </div>
-      </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className={cn("flex-1 rounded-r-[30px] pr-0 hover:bg-transparent")}
-        >
-          <Ellipsis className={cn("h-full size-4")} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={10} className="rounded-lg">
-          <DropdownMenuItem asChild>
-            <Button
-              variant={"destructive"}
-              className="w-full rounded-sm"
-              onClick={() => onDelete("folder", folder.id)}
-            >
-              <Trash className="size-4" />
-              Delete
-            </Button>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </SidebarMenuItem>
-  );
-}
-
-function NoteRow({
-  note,
-  onDelete,
-  onMoveNote,
-}: {
-  note: NoteItem;
-  onMoveNote: (noteId: string) => void;
-  onDelete: (itemType: "note", itemId: string) => Promise<void>;
-}) {
-  const location = useLocation();
-
-  const active = location.pathname.includes(`/notes/${note.id}`);
-
-  return (
-    <SidebarMenuItem
-      key={note.id}
-      className={cn(
-        "flex items-center border rounded-[30px] relative overflow-hidden pl-2",
-        active ? "bg-primary text-white" : "",
-      )}
-      style={{
-        marginLeft: `${note.depth * 16}px`,
-      }}
-    >
-      <SidebarMenuButton
-        asChild
-        className={cn(
-          "p-0 hover:bg-transparent hover:text-none",
-          active ? "bg-primary text-white" : "",
-        )}
-      >
-        <Link
-          className={cn(
-            "flex-6 py-0.5 flex items-center gap-2 text-center rounded-l-[30px]",
-          )}
-          to={`/notes/$noteId`}
-          params={{ noteId: note.id }}
-        >
-          <FileText
-            className={cn("h-full size-4", active ? "text-white" : "")}
-          />
-          {note.title}
-        </Link>
-      </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className={cn(
-            "flex-1 rounded-r-[30px] pr-0 hover:bg-transparent",
-            active ? "bg-primary text-white" : "",
-          )}
-        >
-          <Ellipsis
-            className={cn("h-full size-4", active ? "text-white" : "")}
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          sideOffset={10}
-          className="flex flex-col gap-2 rounded-lg"
-        >
-          <DropdownMenuItem asChild>
-            <Button
-              variant={"outline"}
-              className="w-full rounded-sm"
-              onClick={() => onMoveNote(note.id)}
-            >
-              <Move className="size-4" />
-              Move Note
-            </Button>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Button
-              variant={"destructive"}
-              className="w-full rounded-sm"
-              onClick={() => onDelete("note", note.id)}
-            >
-              <Trash className="size-4" />
-              Delete
-            </Button>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </SidebarMenuItem>
   );
 }
