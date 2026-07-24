@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      target: deps
+    container_name: syncnotes-frontend-dev
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    volumes:
+      # Hot-reload: mount source and config files
+      - ./src:/usr/src/app/src
+      - ./public:/usr/src/app/public
+      - ./index.html:/usr/src/app/index.html
+      - ./vite.config.ts:/usr/src/app/vite.config.ts
+      - ./vite-d.env.ts:/usr/src/app/vite-d.env.ts
+      - ./tsconfig.json:/usr/src/app/tsconfig.json
+      - ./tsconfig.app.json:/usr/src/app/tsconfig.app.json
+      - ./tsconfig.node.json:/usr/src/app/tsconfig.node.json
+    environment:
+      VITE_BASE_URL: http://localhost:3000
+    command: pnpm run dev
