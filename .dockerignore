@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Version control
+.git
+.gitignore
+.github
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Docker files
+Dockerfile
+docker-compose.yml
+docker-compose.dev.yml
+docker-compose.prod.yml
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db

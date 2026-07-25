@@ -22,6 +22,16 @@ export default defineConfig({
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  preview: {
+    port: 5174,
+    strictPort: true,
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+    origin: 'http://localhost:5173',
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, './src'),
