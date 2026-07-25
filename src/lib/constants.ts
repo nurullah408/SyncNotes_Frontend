@@ -36,23 +36,23 @@ export const EDITOR_THEME = {
   },
   list: {
     nested: {
-      listitem: "list-none pl-4",
+      listitem: "list-none pl-4 focus:outline-none",
     },
     // 1. Move the specific list styles down, or keep them mutually exclusive
     ol: "list-decimal pl-6 my-2 gap-1",
     ul: "list-disc pl-6 my-2 gap-1",
-    listitem: "text-slate-800",
+    listitem: "text-slate-800 focus:outline-none",
 
     // 2. Add an explicit !important flag (via Tailwind's !) to force checklists to reset
     // their dimensions, overriding the zombie 'ul' padding.
-    checklist: "!list-none !pl-2 p-0 m-0 my-2",
+    checklist: "!list-none !pl-2 p-0 m-0 my-2 focus:outline-none",
 
     // 3. Keep your clean layout, but make sure left positioning coordinates match the pl-2 layout
     listitemUnchecked:
-      "list-none relative pl-6 text-slate-800 select-none before:content-['☐'] before:text-slate-700 before:absolute before:left-0 before:top-0",
+      "list-none relative pl-6 text-slate-800 select-none focus:outline-none before:content-['☐'] before:text-slate-700 before:absolute before:left-0 before:top-0",
 
     listitemChecked:
-      "list-none relative pl-6 line-through text-slate-400 select-none before:content-['✓'] before:text-black before:absolute before:left-0 before:top-0",
+      "list-none relative pl-6 line-through text-slate-400 select-none focus:outline-none before:content-['✓'] before:text-black before:absolute before:left-0 before:top-0",
   },
   image: "max-w-full h-auto rounded-lg",
   link: "text-primary underline underline-offset-4 cursor-pointer hover:text-primary/80",
@@ -97,6 +97,7 @@ export const EDITOR_THEME = {
     url: "text-primary underline",
     variable: "text-chart-5",
   },
+  internalLink: "p-1 bg-muted rounded-md text-foreground hover:bg-accent"
 };
 
 export const EMPTY_CONTENT = "(An empty Note)";

@@ -26,6 +26,9 @@ import type { EditorState } from "lexical";
 import { InitializePlugin } from "@/routes/_auth/notes/-components/lexical-plugins/InitializePlugin";
 import { EDITOR_THEME } from "@/lib/constants";
 import { SlashMenuPlugin } from "@/routes/_auth/notes/-components/lexical-plugins/SlashMenuPlugin";
+import { useRef, type MouseEvent } from "react";
+import { InternalLinkNode } from "@/lib/lexical/nodes/InternalLinkNode";
+import { InternalLinkPlugin } from "@/routes/_auth/notes/-components/lexical-plugins/InternalLinkPlugin";
 
 interface EditorProps {
   initialContent: string;
@@ -63,6 +66,7 @@ export function Editor({
       ListItemNode,
       CodeNode,
       CodeHighlightNode,
+      InternalLinkNode,
     ],
   };
 
@@ -74,12 +78,21 @@ export function Editor({
     QUOTE,
   ];
 
+  const contentEditableRef = useRef<HTMLDivElement>(null);
+
+  const handleOnClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    if (contentEditableRef.current) {
+      contentEditableRef.current.focus();
+    }
+  };
+
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <RichTextPlugin
-        contentEditable={<ContentEditable className={className} />}
+        contentEditable={<ContentEditable ref={contentEditableRef} className={className} />}
         placeholder={
-          <div className={placeholderClassName}>Enter some text...</div>
+          <div onClick={handleOnClick} className={placeholderClassName}>Enter some text...</div>
         }
         ErrorBoundary={LexicalErrorBoundary}
       />
@@ -91,6 +104,7 @@ export function Editor({
       <AutoFocusPlugin />
       <MarkdownShortcutPlugin transformers={CUSTOM_MARKDOWN_TRANSFORMERS} />
       <SlashMenuPlugin />
+      <InternalLinkPlugin />
       {children}
     </LexicalComposer>
   );

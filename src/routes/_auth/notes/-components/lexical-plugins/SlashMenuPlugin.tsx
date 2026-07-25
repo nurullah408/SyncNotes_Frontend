@@ -2,7 +2,6 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 // TypeAheadPlugin
 import {
   LexicalTypeaheadMenuPlugin,
-  MenuOption,
   useBasicTypeaheadTriggerMatch,
 } from "@lexical/react/LexicalTypeaheadMenuPlugin";
 // functions and commands
@@ -19,24 +18,10 @@ import {
 } from "@lexical/list";
 // React Imports
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
+import { Heading1, Heading2, Heading3, Heading4, List, ListOrdered, Quote, Type } from "lucide-react";
+import { SlashMenuOption } from "@/lib/lexical/classes/SlashMenuOption";
 
-class SlashMenuOption extends MenuOption {
-  title: string;
-  icon?: React.JSX.Element;
-  onSelect: (queryString: string) => void;
-
-  constructor(
-    title: string,
-    options: { onSelect: (queryString: string) => void },
-    icon?: React.JSX.Element,
-  ) {
-    super(title);
-    this.title = title;
-    this.icon = icon;
-    this.onSelect = options.onSelect;
-  }
-}
 
 export function SlashMenuPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -61,7 +46,9 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      },
+        <Type className="size-4" />,
+      ),
       new SlashMenuOption("Heading 1", {
         onSelect: () => {
           editor.update(() => {
@@ -75,7 +62,9 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      },
+        <Heading1 className="size-4" />,
+      ),
       new SlashMenuOption("Heading 2", {
         onSelect: () => {
           editor.update(() => {
@@ -89,7 +78,8 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      }, <Heading2 className="size-4" />,
+      ),
       new SlashMenuOption("Heading 3", {
         onSelect: () => {
           editor.update(() => {
@@ -103,7 +93,9 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      },
+        <Heading3 className="size-4" />,
+      ),
       new SlashMenuOption("Heading 4", {
         onSelect: () => {
           editor.update(() => {
@@ -117,17 +109,17 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      }, <Heading4 className="size-4" />),
       new SlashMenuOption("Bullet List", {
         onSelect: () => {
           editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined);
         },
-      }),
+      }, <List className="size-4" />),
       new SlashMenuOption("Ordered List", {
         onSelect: () => {
           editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
         },
-      }),
+      }, <ListOrdered className="size-4" />),
       new SlashMenuOption("Quote", {
         onSelect: () => {
           editor.update(() => {
@@ -139,7 +131,7 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }),
+      }, <Quote className="size-4" />),
     ];
 
     if (queryString) {
@@ -179,7 +171,7 @@ export function SlashMenuPlugin() {
       ) => {
         if (!anchorElementRef.current || options.length === 0) return null;
         return (
-          <MenuPositioner
+          <SlashMenu
             anchorElement={anchorElementRef.current}
             selectedIndex={selectedIndex}
             selectOptionAndCleanUp={selectOptionAndCleanUp}
@@ -192,7 +184,7 @@ export function SlashMenuPlugin() {
   );
 }
 
-function MenuPositioner({
+function SlashMenu({
   anchorElement,
   selectedIndex,
   selectOptionAndCleanUp,
@@ -237,7 +229,7 @@ function MenuPositioner({
     };
   }, [anchorElement]);
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div
       className="bg-background text-sm shadow-lg max-w-45 min-w-45 p-1"
       style={{
@@ -267,9 +259,9 @@ function MenuPositioner({
               ref={option.setRefElement}
               onMouseEnter={() => setHighlightedIndex(index)}
               onClick={() => selectOptionAndCleanUp(option)}
-              className={`cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
+              className={`flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
             >
-              {option.title}
+              {option.icon && option.icon} {option.title}
             </li>
           );
         })}
