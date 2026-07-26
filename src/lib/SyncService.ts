@@ -108,17 +108,20 @@ export class SyncService {
     let lastSyncedAt = raw ? new Date(JSON.parse(raw)) : new Date(0);
 
     // Drain unsent change records in batches of 200.
-    // Uses table-scan (filter) instead of where() to avoid
-    // IDBKeyRange errors on the synced index.
-    let offset = 0;
+    // Uses cursor-based pagination on the auto-increment id so that
+    // interleaved bulkDelete calls don't shift row positions and skip records.
+    let lastId = 0;
     let didSend = false;
     while (true) {
       const page = await db.changeRecords
-        .offset(offset)
+        .where("id")
+        .above(lastId)
         .limit(200)
         .toArray();
       const unsent = page.filter((r) => r.synced === false);
-      offset += page.length;
+      if (page.length > 0) {
+        lastId = page[page.length - 1].id!;
+      }
 
       // Stop once we've sent something AND there are no more records
       if (page.length === 0) {
