@@ -19,4 +19,5 @@ services:
       - ./tsconfig.node.json:/usr/src/app/tsconfig.node.json
     environment:
       VITE_BASE_URL: http://localhost:3000
-    command: pnpm run dev
+    command: pnpm run dev -- --clearScreen false
+    tty: true

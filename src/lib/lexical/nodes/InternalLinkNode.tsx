@@ -46,7 +46,9 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
   static importJSON(
     serializedInternalLinkNode: SerializedInternalLinkNode,
   ): InternalLinkNode {
-    return new InternalLinkNode(serializedInternalLinkNode.noteId, serializedInternalLinkNode.title);
+    return $applyNodeReplacement(
+      new InternalLinkNode(serializedInternalLinkNode.noteId, serializedInternalLinkNode.title)
+    );
   }
 
   exportJSON(): SerializedInternalLinkNode {
@@ -97,6 +99,14 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
     element.setAttribute("data-title", this.__title);
     element.textContent = this.__title;
     return { element };
+  }
+
+  getTextContent(): string {
+    return this.__title;
+  }
+
+  decorateTextContent(): string {
+    return this.__title;
   }
 
   decorate (): ReactElement {

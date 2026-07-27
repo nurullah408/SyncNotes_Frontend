@@ -57,9 +57,28 @@ export function Note() {
 
   const { isSyncing } = useSyncContext();
 
-  const updateNote = useDebouncedCallback(
-    async (updates: Partial<Note>) => {
-      await db.notes.update(params.noteId,{ ...updates } as Note);
+  const updateNoteTitle = useDebouncedCallback(
+    async (title: string) => {
+      await db.notes.update(params.noteId, { title, updatedAt: new Date().toISOString() });
+    },
+    500,
+  );
+
+  const updateNoteContent = useDebouncedCallback(
+    async (editorState: EditorState) => {
+      const { json, textContent } = editorState.read(() => {
+        const root = $getRoot();
+        const json = root.isEmpty()
+          ? INITIAL_EDITOR_STATE // This is already stringified
+          : JSON.stringify(editorState.toJSON());
+        return { json, textContent: root.getTextContent() };
+      });
+
+      await db.notes.update(params.noteId, {
+        content: json,
+        searchContent: textContent,
+        updatedAt: new Date().toISOString(),
+      } as Note);
     },
   500);
 
@@ -69,25 +88,11 @@ export function Note() {
 
   function onChangeTitle(event: ChangeEvent<HTMLInputElement>) {
     const { value } = event.currentTarget;
-    updateNote({ title: value });
+    updateNoteTitle(value);
   }
 
   function onEditorChange(editorState: EditorState) {
-    editorState.read(() => {
-      const root = $getRoot();
-
-      const json = root.isEmpty()
-        ? INITIAL_EDITOR_STATE // This is already stringified
-        : JSON.stringify(editorState.toJSON());
-
-      const textContent = root.getTextContent();
-
-      updateNote({
-        content: json,
-        searchContent: textContent,
-        updatedAt: new Date().toISOString(),
-      });
-    });
+    updateNoteContent(editorState);
   }
 
   const handleContainerClick = (e: React.MouseEvent) => {
@@ -240,7 +245,7 @@ export function Note() {
         <h3 className="text-sm font-semibold text-gray-600">
           Last updated on{" "}
           <span className="italic text-sm">
-            {new Date(note?.updatedAt || "").toLocaleString()}
+            {note?.updatedAt ? new Date(note.updatedAt).toLocaleString() : ""}
           </span>
         </h3>
         <div className="h-[80%] rounded-lg overflow-y-auto">

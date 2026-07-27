@@ -106,6 +106,7 @@ export class SyncService {
   private async executeSync(): Promise<void> {
     const raw = localStorage.getItem(LOCAL_STORAGE_SYNC_KEY);
     let lastSyncedAt = raw ? new Date(JSON.parse(raw)) : new Date(0);
+    const isInitialSync = !raw;
 
     // Drain unsent change records in batches of 200.
     // Uses cursor-based pagination on the auto-increment id so that
@@ -123,10 +124,18 @@ export class SyncService {
         lastId = page[page.length - 1].id!;
       }
 
-      // Stop once we've sent something AND there are no more records
+      // No more records in the DB
       if (page.length === 0) {
         if (didSend) break;
-        // Empty DB but no request sent yet — fall through to initial sync
+        // Only fall through for the very first sync (no stored lastSyncedAt).
+        // On periodic / event-driven syncs with no changes, skip entirely.
+        if (!isInitialSync) break;
+      }
+
+      // Skip the request if there are truly no unsent changes to push
+      // (all records in this page were already synced).
+      if (unsent.length === 0 && !isInitialSync) {
+        break;
       }
 
       let result = await this.sendAndApply(
@@ -138,7 +147,7 @@ export class SyncService {
 
       // Paginate through remaining downstream pages
       let cursor = result.nextCursor;
-      while (result.hasMore && cursor) {
+      while (result.hasMore === true && cursor !== null) {
         result = await this.sendAndApply([], lastSyncedAt, cursor);
         cursor = result.nextCursor;
       }
@@ -164,6 +173,7 @@ export class SyncService {
     lastSyncedAt: Date,
     cursor: string | null,
   ): Promise<SyncChangesResponse> {
+
     const body: Record<string, unknown> = {
       changes: changes.map((c) => ({
         id: c.id,
