@@ -18,8 +18,10 @@ export function InitializePlugin({ json }: { json: string | null }) {
     }
 
     // Genuinely new content (navigation, sync) — push it into the editor
-    const editorState = editor.parseEditorState(json);
-    editor.setEditorState(editorState);
+    queueMicrotask(() => { // This is done in a microtask to avoid getting flushSync warnings from react
+      const editorState = editor.parseEditorState(json);
+      editor.setEditorState(editorState);
+    });
     lastJsonRef.current = json;
   }, [json, editor]);
 

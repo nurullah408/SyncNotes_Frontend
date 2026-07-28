@@ -16,12 +16,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
-import type { NoteSettings } from "@/types/local-storage/NoteSettings.ts";
-import { Label } from "@/components/ui/label.tsx";
-import { Input } from "@/components/ui/input.tsx";
 import { useGlobalStore } from "@/store/store.tsx";
 import { db } from "@/db/syncNotesDb.ts";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useHandleInternalLinkClick } from "../-hooks/useHandleInternalLinkClick";
+import { NoteSettings } from "./NoteSettings";
+import type { TNoteSettings } from "@/types/local-storage/NoteSettings";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
@@ -38,7 +38,7 @@ export function Note() {
     })
   }, [params.noteId]);
 
-  const [noteSettings, setNoteSettings] = useLocalStorage<NoteSettings>(
+  const [noteSettings, setNoteSettings] = useLocalStorage<TNoteSettings>(
     "note-settings",
     {
       showSeconds: false,
@@ -57,9 +57,28 @@ export function Note() {
 
   const { isSyncing } = useSyncContext();
 
-  const updateNote = useDebouncedCallback(
-    async (updates: Partial<Note>) => {
-      await db.notes.update(params.noteId,{ ...updates } as Note);
+  const updateNoteTitle = useDebouncedCallback(
+    async (title: string) => {
+      await db.notes.update(params.noteId, { title, updatedAt: new Date().toISOString() });
+    },
+    500,
+  );
+
+  const updateNoteContent = useDebouncedCallback(
+    async (editorState: EditorState) => {
+      const { json, textContent } = editorState.read(() => {
+        const root = $getRoot();
+        const json = root.isEmpty()
+          ? INITIAL_EDITOR_STATE // This is already stringified
+          : JSON.stringify(editorState.toJSON());
+        return { json, textContent: root.getTextContent() };
+      });
+
+      await db.notes.update(params.noteId, {
+        content: json,
+        searchContent: textContent,
+        updatedAt: new Date().toISOString(),
+      } as Note);
     },
   500);
 
@@ -69,25 +88,11 @@ export function Note() {
 
   function onChangeTitle(event: ChangeEvent<HTMLInputElement>) {
     const { value } = event.currentTarget;
-    updateNote({ title: value });
+    updateNoteTitle(value);
   }
 
   function onEditorChange(editorState: EditorState) {
-    editorState.read(() => {
-      const root = $getRoot();
-
-      const json = root.isEmpty()
-        ? INITIAL_EDITOR_STATE // This is already stringified
-        : JSON.stringify(editorState.toJSON());
-
-      const textContent = root.getTextContent();
-
-      updateNote({
-        content: json,
-        searchContent: textContent,
-        updatedAt: new Date().toISOString(),
-      });
-    });
+    updateNoteContent(editorState);
   }
 
   const handleContainerClick = (e: React.MouseEvent) => {
@@ -100,6 +105,8 @@ export function Note() {
     )
       return;
   };
+
+  useHandleInternalLinkClick();
 
   const title = note ? note.title : "Untitled";
 
@@ -238,50 +245,17 @@ export function Note() {
         <h3 className="text-sm font-semibold text-gray-600">
           Last updated on{" "}
           <span className="italic text-sm">
-            {new Date(note?.updatedAt || "").toLocaleString()}
+            {note?.updatedAt ? new Date(note.updatedAt).toLocaleString() : ""}
           </span>
         </h3>
         <div className="h-[80%] rounded-lg overflow-y-auto">
           <Editor
-            className="px-1 focus:outline-none"
+            className="px-1 w-full focus:outline-none"
             placeholderClassName="absolute top-22 left-1 text-gray-400"
             initialContent={content}
             onChange={onEditorChange}
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function NoteSettings({
-  noteSettings,
-  onChangeNoteSettings,
-}: {
-  noteSettings: NoteSettings;
-  onChangeNoteSettings: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-center justify-between gap-1">
-        <Label>Show Seconds?</Label>
-        <Input
-          name="showSeconds"
-          className="size-4 accent-accent"
-          type="checkbox"
-          onChange={onChangeNoteSettings}
-          checked={noteSettings.showSeconds}
-        />
-      </div>
-      <div className="flex items-center justify-between gap-1">
-        <Label>12 Hour Format?</Label>
-        <Input
-          name="hourFormat"
-          className="size-4 accent-accent"
-          type="checkbox"
-          onChange={onChangeNoteSettings}
-          checked={noteSettings.hourFormat === "12"}
-        />
       </div>
     </div>
   );

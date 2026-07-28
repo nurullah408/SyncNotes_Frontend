@@ -83,7 +83,7 @@ function createChangeTrackerMiddleware(): Middleware<DBCore> {
                 if (req.changeSpec || req.updates) {
                   // table.update(key, changes)  →  "update" (or "delete" if isDeleted)
                   const keys: string[] =
-                    req.updates?.keys ?? req.keys ?? [];
+                    req.updates?.keys ?? req.keys ?? (req.values as Record<string, unknown>[])?.map((v) => v.id as string) ?? [];
                   for (let i = 0; i < keys.length; i++) {
                     const entityId = keys[i];
                     const spec: Record<string, unknown> =
@@ -148,8 +148,8 @@ function createChangeTrackerMiddleware(): Middleware<DBCore> {
 
               // 4. Persist change records, then notify sync service
               if (changes.length > 0) {
-                Dexie.ignoreTransaction(() => {
-                  db.changeRecords
+                Dexie.ignoreTransaction(async () => {
+                  return db.changeRecords
                     .bulkAdd(changes)
                     .then(() => __onChangeHandler?.())
                     .catch(console.error);
