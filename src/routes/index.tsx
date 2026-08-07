@@ -22,7 +22,7 @@ function RouteComponent() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild>
+          <Button>
             <Link
               to="/login"
               viewTransition={{
@@ -33,7 +33,7 @@ function RouteComponent() {
               Login
             </Link>
           </Button>
-          <Button asChild>
+          <Button>
             <Link
               to="/signup"
               viewTransition={{

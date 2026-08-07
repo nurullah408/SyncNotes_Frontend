@@ -23,13 +23,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import IconV1 from "@/assets/variant-1.svg?react";
+import { ApiError } from "@/lib/ApiError";
 
 type ZFormValues = z.infer<typeof loginSchema>;
 
 export function Login() {
   const router = useRouter();
 
-  const loginMutation = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: async (loginValues: ZFormValues) => {
       const result = await fetch(`${BASE_URL}/auth/signin`, {
         headers: {
@@ -41,9 +42,15 @@ export function Login() {
       });
 
       if (!result.ok) {
-        const error = await result.json();
-        console.log(error);
-        throw new Error(error);
+        const error: ApiError = await result.json();
+        if (error?.statusCode === 403) {
+          const email = form.getValues('email');
+          router.navigate({
+            to: '/verify-email',
+            search: { email },
+          })
+        }
+        throw error;
       }
       return result.json();
     },
@@ -57,8 +64,15 @@ export function Login() {
       });
     },
     onError: (error) => {
-      console.log(error);
-      toast.error("Something went wrong.");
+      if (error instanceof ApiError && error.statusCode === 403) {
+        const email = form.getValues('email');
+        router.navigate({
+          to: '/verify-email',
+          search: { email },
+        })
+      } else {
+        toast.error("Invalid credentials");
+      }
     },
   });
 
@@ -71,7 +85,7 @@ export function Login() {
   });
 
   function onSubmit(loginValues: ZFormValues) {
-    loginMutation.mutate(loginValues);
+    mutate(loginValues);
   }
 
   return (
@@ -82,7 +96,7 @@ export function Login() {
             <IconV1 className="w-full h-full" />
           </Link>
         </div>
-        <Button asChild>
+        <Button>
           <Link to="/" viewTransition={{ types: ["slide-right"] }}>
             Home
           </Link>
@@ -138,7 +152,7 @@ export function Login() {
                 )}
               />
             </FieldGroup>
-            <Button type="submit">Login</Button>
+            <Button type="submit" disabled={isPending}>Login</Button>
           </form>
         </CardContent>
       </Card>

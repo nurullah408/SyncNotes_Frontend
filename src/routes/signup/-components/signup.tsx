@@ -82,7 +82,7 @@ export function Signup() {
             <IconV1 className="w-full h-full" />
           </Link>
         </div>
-        <Button asChild>
+        <Button>
           <Link to="/" viewTransition={{ types: ["slide-right"] }}>
             Home
           </Link>

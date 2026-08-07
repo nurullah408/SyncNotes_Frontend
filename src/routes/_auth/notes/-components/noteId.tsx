@@ -125,7 +125,6 @@ export function Note() {
               "flex-0 rounded-lg",
               open ? "invisible pointer-events-none" : "visible",
             )}
-            asChild
           >
             <SidebarTrigger />
           </Button>
@@ -191,7 +190,6 @@ export function Note() {
               "flex-0 rounded-lg",
               open ? "invisible pointer-events-none" : "visible",
             )}
-            asChild
           >
             <SidebarTrigger />
           </Button>
