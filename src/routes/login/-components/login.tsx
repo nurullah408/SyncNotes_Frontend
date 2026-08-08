@@ -71,7 +71,7 @@ export function Login() {
           search: { email },
         })
       } else {
-        toast.error("Invalid credentials");
+        toast.error(error?.message || "Something went wrong.");
       }
     },
   });
@@ -154,6 +154,15 @@ export function Login() {
             </FieldGroup>
             <Button type="submit" disabled={isPending}>Login</Button>
           </form>
+          <div className="flex items-center gap-2 justify-center my-4">
+            <hr className="w-1/3 h-1" /><span>OR</span><hr className="w-1/3 h-1" />
+          </div>
+          <div className="flex items-center gap-2 justify-center">
+            <span>Don't have an account? </span>
+            <Link to="/signup" className="underline underline-offset-1" viewTransition={{ types: ["slide-right"] }}>
+              Sign up
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

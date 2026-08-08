@@ -3,10 +3,6 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/noto-sans";
 @import "@fontsource-variable/raleway";
-
-@custom-variant dark (&:is(.dark *));
-
-@import "tailwindcss";
 @import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
@@ -223,7 +219,7 @@
   }
 
   html {
-    @apply font-mono;
+    @apply font-sans;
   }
 }
 

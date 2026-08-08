@@ -155,7 +155,7 @@ function Index() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="otp">OTP</FieldLabel>
-                    <InputOTP maxLength={6} {...field}>
+                    <InputOTP maxLength={6} {...field} className="justify-center">
                       <InputOTPGroup>
                         <InputOTPSlot index={0} />
                         <InputOTPSlot index={1} />

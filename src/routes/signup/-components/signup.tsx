@@ -23,13 +23,17 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 type ZFormValues = z.infer<typeof signupSchema>;
 
 export function Signup() {
   const router = useRouter();
 
-  const signupMutation = useMutation({
+  const [showPassword, setShowPassword] = useState<'password' | 'text'>('password');
+
+  const { mutate, isPending } = useMutation({
     mutationFn: async (signupValues: ZFormValues) => {
       const result = await fetch(`${BASE_URL}/auth/signup`, {
         headers: {
@@ -50,15 +54,12 @@ export function Signup() {
     onSuccess: async () => {
       await router.invalidate();
       await router.navigate({
-        to: "/notes",
-        viewTransition: {
-          types: ["slide-left"],
-        },
+        to: "/verify-email",
+        search: { email: form.getValues().email }
       });
     },
     onError: (error) => {
-      console.log(error);
-      toast.error("Something went wrong.");
+      toast.error(error?.message || "Something went wrong.");
     },
   });
 
@@ -66,12 +67,14 @@ export function Signup() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       email: "",
+      name: "",
       password: "",
+      confirmPassword: ""
     },
   });
 
-  function onSubmit(signupValues: ZFormValues) {
-    signupMutation.mutate(signupValues);
+  const onSubmit = (signupValues: ZFormValues) => {
+    mutate(signupValues);
   }
 
   return (
@@ -95,6 +98,27 @@ export function Signup() {
         </CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+            <FieldGroup>
+              <Controller
+                name="name"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="name">Name</FieldLabel>
+                    <Input
+                      {...field}
+                      id="name"
+                      aria-invalid={fieldState.invalid}
+                      placeholder="John Doe"
+                      autoComplete="off"
+                    />
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+            </FieldGroup>
             <FieldGroup>
               <Controller
                 name="email"
@@ -123,14 +147,44 @@ export function Signup() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="password">Password</FieldLabel>
-                    <Input
+                    <div className="flex items-center">
+                      <Input
                       {...field}
                       id="password"
                       aria-invalid={fieldState.invalid}
                       placeholder="*******"
                       autoComplete="off"
-                      type="password"
+                      type={showPassword}
                     />
+                    <Button variant={'ghost'} className="h-10" type="button" onClick={() => setShowPassword(showPassword === 'password' ? 'text' : 'password')}>
+                      {showPassword === 'password' ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                      </Button>
+                    </div>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="confirmPassword"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="confirmPassword">Confirm Password</FieldLabel>
+                    <div className="flex items-center">
+                      <Input
+                      {...field}
+                      id="confirmPassword"
+                      aria-invalid={fieldState.invalid}
+                      placeholder="*******"
+                      autoComplete="off"
+                      type={showPassword}
+                    />
+                    <Button variant={'ghost'} className="h-10" type="button" onClick={() => setShowPassword(showPassword === 'password' ? 'text' : 'password')}>
+                      {showPassword === 'password' ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                      </Button>
+                    </div>
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
                     )}
@@ -138,7 +192,7 @@ export function Signup() {
                 )}
               />
             </FieldGroup>
-            <Button type="submit">Signup</Button>
+            <Button type="submit" disabled={isPending}>Signup</Button>
           </form>
         </CardContent>
       </Card>
