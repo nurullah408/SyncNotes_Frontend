@@ -42,15 +42,8 @@ export function Login() {
       });
 
       if (!result.ok) {
-        const error: ApiError = await result.json();
-        if (error?.statusCode === 403) {
-          const email = form.getValues('email');
-          router.navigate({
-            to: '/verify-email',
-            search: { email },
-          })
-        }
-        throw error;
+        const errorBody = await result.json();
+        throw new ApiError(result.status, errorBody?.message ?? "Something went wrong.");
       }
       return result.json();
     },

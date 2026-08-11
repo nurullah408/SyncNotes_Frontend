@@ -22,6 +22,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useHandleInternalLinkClick } from "../-hooks/useHandleInternalLinkClick";
 import { NoteSettings } from "./NoteSettings";
 import type { TNoteSettings } from "@/types/local-storage/NoteSettings";
+import ProfileSettings from "@/components/ProfileSettings";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
@@ -139,6 +140,7 @@ export function Note() {
         </Button>
         {/* Note header right side */}
         <div className="flex gap-1 items-center">
+          <p>Hello World</p>
           <div className="flex items-center gap-1">
             {isSyncing ? (
               <>
@@ -163,6 +165,7 @@ export function Note() {
               />
             </PopoverContent>
           </Popover>
+          <ProfileSettings />
         </div>
       </div>
       <div className="relative flex flex-col gap-2 h-full overflow-hidden">
