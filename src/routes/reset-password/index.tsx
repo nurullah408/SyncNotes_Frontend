@@ -53,8 +53,7 @@ function ResetPassword() {
     onSuccess: async () => {
       await router.invalidate();
       await router.navigate({
-        to: "/verify-email",
-        search: { email: form.getValues().email }
+        to: "/login",
       });
     },
     onError: (error) => {

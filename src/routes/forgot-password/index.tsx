@@ -116,6 +116,9 @@ function ForgotPassword() {
               Sign up
             </Link>
           </div>
+          <div className="">
+            {submitted && <p>Please check your email for a reset link.</p>}
+          </div>
         </CardContent>
       </Card>
     </div>
