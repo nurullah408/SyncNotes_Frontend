@@ -49,6 +49,7 @@ export function Login() {
         const errorBody = await result.json();
         throw new ApiError(result.status, errorBody?.message ?? "Something went wrong.");
       }
+
       return result.json();
     },
     onSuccess: async () => {
@@ -149,6 +150,9 @@ export function Login() {
                 )}
               />
             </FieldGroup>
+            <div className="flex items-center justify-end">
+              <Link to="/forgot-password" className="text-sm underline underline-offset-2">Forgot password?</Link>
+            </div>
             <Button type="submit" disabled={isPending}>Login</Button>
           </form>
           <div className="flex items-center gap-2 justify-center my-4">
