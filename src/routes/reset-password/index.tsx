@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState } from 'react';
 import { resetPasswordSchema } from './-schema/schema';
-import type z from 'zod';
+import { z } from 'zod';
 import { BASE_URL } from '@/constants';
 import { toast } from 'sonner';
 import { Controller, useForm } from 'react-hook-form';
@@ -15,13 +15,19 @@ import { Input } from '@/components/ui/input';
 import { Eye, EyeOff } from 'lucide-react';
 import IconV1 from "@/assets/variant-1.svg?react";
 
+const resetPasswordSearchSchema = z.object({
+  token: z.string(),
+})
+
 export const Route = createFileRoute('/reset-password/')({
+  validateSearch: resetPasswordSearchSchema,
   component: ResetPassword,
 });
 
 type ZFormValues = z.infer<typeof resetPasswordSchema>;
 
 function ResetPassword() {
+  const { token } = Route.useSearch();
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState<'password' | 'text'>('password');
@@ -33,7 +39,7 @@ function ResetPassword() {
           "content-type": "application/json",
         },
         method: "POST",
-        body: JSON.stringify(signupValues),
+        body: JSON.stringify({ ...signupValues, token }),
         credentials: "include",
       });
 
