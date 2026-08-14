@@ -28,16 +28,22 @@ export function InternalLinkPlugin() {
     if (!q) {
       return [
       ...allNotes
-    ].sort(
+    ].toSorted(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     ).slice(
       0, 8
       ).map((n) => new InternalLinkOption(n.id, n.title))
     };
 
-    return allNotes.filter(
-      (n) => n.title.includes(q)
-    ).map((n) => new InternalLinkOption(n.id, n.title || "Untitled"))
+    const matches: InternalLinkOption[] = [];
+
+    for (const n of allNotes) {
+      if (n.title.toLowerCase().includes(q)) {
+        matches.push(new InternalLinkOption(n.id, n.title || "Untitled"));
+      }
+    }
+
+    return matches;
 
   }, [allNotes, queryString]);
 
@@ -177,6 +183,8 @@ function InternalLinkMenu({
         const isSelected = selectedIndex === index;
         return (
           <li
+            role="option"
+            aria-selected={isSelected}
             key={option.noteId}
             ref={option.setRefElement}
             onMouseEnter={() => setHighlightedIndex(index)}

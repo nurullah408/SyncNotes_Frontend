@@ -10,7 +10,7 @@ export function getTextPreview(jsonSting: string, maxLength = 120): string {
         text += node.text;
       }
       if ("children" in node) {
-        node?.children.forEach(extractText);
+        (node?.children as (RootNode | TextNode)[]).forEach(extractText);
       }
     };
     extractText(parsed.root);
@@ -23,4 +23,8 @@ export function getTextPreview(jsonSting: string, maxLength = 120): string {
   } catch {
     return EMPTY_CONTENT;
   }
+}
+
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

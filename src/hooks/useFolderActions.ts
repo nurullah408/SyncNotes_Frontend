@@ -1,6 +1,6 @@
 import { db } from "@/db/syncNotesDb";
 import { QUERY_KEYS } from "@/lib/query-keys";
-import type { Folder } from "@/types/Folder";
+import type { Folder } from "../types/entities/Folder";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSyncContext } from "@/context/SyncContext";
 

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/db/syncNotesDb";
 import type { Note } from "@/types/entities/Note";
 import { INITIAL_EDITOR_STATE } from "@/lib/constants";
-import ProfileSettings from "@/components/ProfileSettings";
 
 export const Route = createFileRoute("/_auth/notes/")({
   component: Index,
@@ -43,9 +42,6 @@ function Index() {
           <h4 className="text-sm font-bold text-muted-foreground">
             Sync Notes
           </h4>
-        </div>
-        <div>
-          <ProfileSettings />
         </div>
       </Header>
 

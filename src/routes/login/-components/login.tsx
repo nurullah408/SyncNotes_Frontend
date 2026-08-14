@@ -1,7 +1,7 @@
 import type z from "zod";
 import { loginSchema } from "../-schema/schema";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,10 +25,14 @@ import { toast } from "sonner";
 import IconV1 from "@/assets/variant-1.svg?react";
 import { ApiError } from "@/lib/ApiError";
 
+
 type ZFormValues = z.infer<typeof loginSchema>;
 
 export function Login() {
+
   const router = useRouter();
+
+  const queryClient = useQueryClient();
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (loginValues: ZFormValues) => {
@@ -48,7 +52,7 @@ export function Login() {
       return result.json();
     },
     onSuccess: async () => {
-      await router.invalidate();
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
       await router.navigate({
         to: "/notes",
         viewTransition: {

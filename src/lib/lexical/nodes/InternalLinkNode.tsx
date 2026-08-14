@@ -128,7 +128,3 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
 export function $createInternalLinkNode(noteId: string, title: string): InternalLinkNode {
   return new InternalLinkNode(noteId, title);
 }
-
-export function $isInternalLinkNode(node: LexicalNode | null | undefined): node is InternalLinkNode {
-  return node instanceof InternalLinkNode;
-}
