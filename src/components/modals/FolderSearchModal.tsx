@@ -85,9 +85,9 @@ export function FolderSearchModal({
                     className="animate-pulse duration-500 w-full h-10"
                   />
                 ))
-              : folders?.map((res, i) => (
+              : folders?.map((res) => (
                   <SearchResult
-                    key={i}
+                    key={res.id}
                     {...res}
                     onClick={() =>
                       onMoveToFolder({ noteId, folderId: res.id })

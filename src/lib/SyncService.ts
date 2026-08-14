@@ -249,9 +249,13 @@ export class SyncService {
             });
             throw err;
           }
-          const toDelete = folders
-            .filter((f) => f.isDeleted)
-            .map((f) => f.id);
+
+          const toDelete: string[] = [];
+
+          for (const f of folders) {
+            if (f.isDeleted) toDelete.push(f.id);
+          }
+
           if (toDelete.length > 0) await db.folders.bulkDelete(toDelete);
         }
 
@@ -283,9 +287,13 @@ export class SyncService {
             });
             throw err;
           }
-          const toDelete = notes
-            .filter((n) => n.isDeleted)
-            .map((n) => n.id);
+
+          const toDelete: string[] = [];
+
+          for (const n of notes) {
+            if (n.isDeleted) toDelete.push(n.id);
+          }
+
           if (toDelete.length > 0) await db.notes.bulkDelete(toDelete);
         }
       });

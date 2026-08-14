@@ -21,6 +21,7 @@ import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Heading1, Heading2, Heading3, Heading4, List, ListOrdered, Quote, Type } from "lucide-react";
 import { SlashMenuOption } from "@/lib/lexical/classes/SlashMenuOption";
+import { escapeRegExp } from "@/lib/lexical/utils";
 
 
 export function SlashMenuPlugin() {
@@ -47,7 +48,7 @@ export function SlashMenuPlugin() {
           });
         },
       },
-        <Type className="size-4" />,
+        <Type key={'type-paragraph-icon'} className="size-4" />,
       ),
       new SlashMenuOption("Heading 1", {
         onSelect: () => {
@@ -63,7 +64,7 @@ export function SlashMenuPlugin() {
           });
         },
       },
-        <Heading1 className="size-4" />,
+        <Heading1 key={'heading-1-icon'} className="size-4" />,
       ),
       new SlashMenuOption("Heading 2", {
         onSelect: () => {
@@ -78,7 +79,7 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }, <Heading2 className="size-4" />,
+      }, <Heading2 key={'heading-2-icon'} className="size-4" />,
       ),
       new SlashMenuOption("Heading 3", {
         onSelect: () => {
@@ -94,7 +95,7 @@ export function SlashMenuPlugin() {
           });
         },
       },
-        <Heading3 className="size-4" />,
+        <Heading3 key={'heading-3-icon'} className="size-4" />,
       ),
       new SlashMenuOption("Heading 4", {
         onSelect: () => {
@@ -109,17 +110,17 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }, <Heading4 className="size-4" />),
+      }, <Heading4 key={'heading-4-icon'} className="size-4" />),
       new SlashMenuOption("Bullet List", {
         onSelect: () => {
           editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined);
         },
-      }, <List className="size-4" />),
+      }, <List key={'bullet-list-icon'} className="size-4" />),
       new SlashMenuOption("Ordered List", {
         onSelect: () => {
           editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
         },
-      }, <ListOrdered className="size-4" />),
+      }, <ListOrdered key={'ordered-list-icon'} className="size-4" />),
       new SlashMenuOption("Quote", {
         onSelect: () => {
           editor.update(() => {
@@ -131,11 +132,11 @@ export function SlashMenuPlugin() {
             }
           });
         },
-      }, <Quote className="size-4" />),
+      }, <Quote key={'quote-icon'} className="size-4" />),
     ];
 
     if (queryString) {
-      const regex = new RegExp(queryString, "i");
+      const regex = new RegExp(escapeRegExp(queryString), "i");
       return baseOptions.filter((option) => regex.test(option.title));
     }
 
@@ -257,6 +258,8 @@ function SlashMenu({
             <li
               key={option.key}
               ref={option.setRefElement}
+              role="option"
+              aria-selected={isSelected}
               onMouseEnter={() => setHighlightedIndex(index)}
               onClick={() => selectOptionAndCleanUp(option)}
               className={`flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}

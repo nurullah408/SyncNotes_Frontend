@@ -1,6 +1,6 @@
 import { useGlobalStore } from "@/store/store";
 import { GlobalSearchModal } from "./GlobalSearchModal";
-import type { DialogPropsMap } from "@/types/DialogPropsMap";
+import type { DialogPropsMap } from "../../types/dialog-types/DialogPropsMap";
 import { FolderSearchModal } from "./FolderSearchModal";
 
 export function ModalManager() {

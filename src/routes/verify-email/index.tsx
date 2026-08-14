@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { verifyEmailSchema } from "./-schema/schema";
 import * as z from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -30,6 +30,9 @@ type ZFormValues = z.infer<typeof verifyEmailSchema>;
 function Index() {
 
   const router = useRouter();
+
+  const queryClient = useQueryClient();
+
   const { email } = Route.useSearch();
 
   const { mutate:VerifyEmail, isPending: isVerifying } = useMutation({
@@ -51,6 +54,7 @@ function Index() {
     },
     onSuccess: async () => {
       await router.invalidate();
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
       await router.navigate({
         to: '/notes',
         viewTransition: {
