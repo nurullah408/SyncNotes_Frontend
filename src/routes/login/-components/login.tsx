@@ -1,7 +1,7 @@
 import type z from "zod";
 import { loginSchema } from "../-schema/schema";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/constants";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,13 +23,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import IconV1 from "@/assets/variant-1.svg?react";
+import { ApiError } from "@/lib/ApiError";
+
 
 type ZFormValues = z.infer<typeof loginSchema>;
 
 export function Login() {
+
   const router = useRouter();
 
-  const loginMutation = useMutation({
+  const queryClient = useQueryClient();
+
+  const { mutate, isPending } = useMutation({
     mutationFn: async (loginValues: ZFormValues) => {
       const result = await fetch(`${BASE_URL}/auth/signin`, {
         headers: {
@@ -41,14 +46,14 @@ export function Login() {
       });
 
       if (!result.ok) {
-        const error = await result.json();
-        console.log(error);
-        throw new Error(error);
+        const errorBody = await result.json();
+        throw new ApiError(result.status, errorBody?.message ?? "Something went wrong.");
       }
+
       return result.json();
     },
     onSuccess: async () => {
-      await router.invalidate();
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
       await router.navigate({
         to: "/notes",
         viewTransition: {
@@ -57,8 +62,15 @@ export function Login() {
       });
     },
     onError: (error) => {
-      console.log(error);
-      toast.error("Something went wrong.");
+      if (error instanceof ApiError && error.statusCode === 403) {
+        const email = form.getValues('email');
+        router.navigate({
+          to: '/verify-email',
+          search: { email },
+        })
+      } else {
+        toast.error(error?.message || "Something went wrong.");
+      }
     },
   });
 
@@ -71,7 +83,7 @@ export function Login() {
   });
 
   function onSubmit(loginValues: ZFormValues) {
-    loginMutation.mutate(loginValues);
+    mutate(loginValues);
   }
 
   return (
@@ -82,7 +94,7 @@ export function Login() {
             <IconV1 className="w-full h-full" />
           </Link>
         </div>
-        <Button asChild>
+        <Button>
           <Link to="/" viewTransition={{ types: ["slide-right"] }}>
             Home
           </Link>
@@ -138,8 +150,20 @@ export function Login() {
                 )}
               />
             </FieldGroup>
-            <Button type="submit">Login</Button>
+            <div className="flex items-center justify-end">
+              <Link to="/forgot-password" className="text-sm underline underline-offset-2">Forgot password?</Link>
+            </div>
+            <Button type="submit" disabled={isPending}>Login</Button>
           </form>
+          <div className="flex items-center gap-2 justify-center my-4">
+            <hr className="w-1/3 h-1" /><span>OR</span><hr className="w-1/3 h-1" />
+          </div>
+          <div className="flex items-center gap-2 justify-center">
+            <span>Don't have an account? </span>
+            <Link to="/signup" className="underline underline-offset-1" viewTransition={{ types: ["slide-right"] }}>
+              Sign up
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

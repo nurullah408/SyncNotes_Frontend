@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VerifyEmailIndexRouteImport } from './routes/verify-email/index'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as AuthNotesRouteRouteImport } from './routes/_auth/notes/route'
@@ -24,6 +25,11 @@ const AuthRoute = AuthRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailIndexRoute = VerifyEmailIndexRouteImport.update({
+  id: '/verify-email/',
+  path: '/verify-email/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupIndexRoute = SignupIndexRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/notes': typeof AuthNotesRouteRouteWithChildren
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/verify-email/': typeof VerifyEmailIndexRoute
   '/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/notes/': typeof AuthNotesIndexRoute
 }
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginIndexRoute
   '/signup': typeof SignupIndexRoute
+  '/verify-email': typeof VerifyEmailIndexRoute
   '/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/notes': typeof AuthNotesIndexRoute
 }
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/_auth/notes': typeof AuthNotesRouteRouteWithChildren
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/verify-email/': typeof VerifyEmailIndexRoute
   '/_auth/notes/$noteId': typeof AuthNotesNoteIdRoute
   '/_auth/notes/': typeof AuthNotesIndexRoute
 }
@@ -84,10 +93,11 @@ export interface FileRouteTypes {
     | '/notes'
     | '/login/'
     | '/signup/'
+    | '/verify-email/'
     | '/notes/$noteId'
     | '/notes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup' | '/notes/$noteId' | '/notes'
+  to: '/' | '/login' | '/signup' | '/verify-email' | '/notes/$noteId' | '/notes'
   id:
     | '__root__'
     | '/'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/_auth/notes'
     | '/login/'
     | '/signup/'
+    | '/verify-email/'
     | '/_auth/notes/$noteId'
     | '/_auth/notes/'
   fileRoutesById: FileRoutesById
@@ -104,6 +115,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   LoginIndexRoute: typeof LoginIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
+  VerifyEmailIndexRoute: typeof VerifyEmailIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -120,6 +132,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email/': {
+      id: '/verify-email/'
+      path: '/verify-email'
+      fullPath: '/verify-email/'
+      preLoaderRoute: typeof VerifyEmailIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup/': {
@@ -189,6 +208,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   LoginIndexRoute: LoginIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
+  VerifyEmailIndexRoute: VerifyEmailIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

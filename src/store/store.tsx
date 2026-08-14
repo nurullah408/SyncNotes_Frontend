@@ -1,5 +1,5 @@
-import type { DialogPropsMap } from "@/types/DialogPropsMap";
-import type { ModalType } from "@/types/ModalType";
+import type { DialogPropsMap } from "../types/dialog-types/DialogPropsMap";
+import type { ModalType } from "../types/dialog-types/ModalType";
 import { create } from "zustand";
 
 type GlobalState = {

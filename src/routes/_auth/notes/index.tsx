@@ -1,14 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/header";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { FilePlus, LogOut, Plus, User } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { BASE_URL } from "@/constants";
+import { FilePlus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/syncNotesDb";
 import type { Note } from "@/types/entities/Note";
@@ -19,7 +11,6 @@ export const Route = createFileRoute("/_auth/notes/")({
 });
 
 function Index() {
-  const queryClient = useQueryClient();
   const navigate = Route.useNavigate();
 
   const createNote = async (note: Note) => {
@@ -43,20 +34,6 @@ function Index() {
     navigate({ to: `/notes/$noteId`, params: { noteId: newNoteId } });
   }
 
-  async function handleLogout() {
-    try {
-      await fetch(`${BASE_URL}/auth/signout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      queryClient.clear();
-      navigate({ to: "/login" });
-    }
-  }
-
   return (
     <div className="[view-transition-name:main-content] w-full h-full flex flex-col overflow-hidden bg-background">
       {/* Dynamic Header Toolbar Row */}
@@ -65,23 +42,6 @@ function Index() {
           <h4 className="text-sm font-bold text-muted-foreground">
             Sync Notes
           </h4>
-        </div>
-        <div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <User className="size-5 cursor-pointer" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-40" align="end">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive cursor-pointer"
-                onClick={handleLogout}
-              >
-                <LogOut className="mr-2 size-4" /> Log Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </Header>
 

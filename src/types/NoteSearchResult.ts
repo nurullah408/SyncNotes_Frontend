@@ -1,4 +1,4 @@
-import type { Note } from "./Note";
+import type { Note } from "../types/entities/Note";
 
 export interface SearchNoteResult extends Pick<
   Note,

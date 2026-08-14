@@ -1,46 +1,45 @@
-import { useMutation } from "@tanstack/react-query";
-import { Link, useRouter } from "@tanstack/react-router";
-import { signupSchema } from "../-schema/schema";
-import { BASE_URL } from "@/constants";
-import { toast } from "sonner";
-import { Controller, useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Header } from "@/components/header";
+import { useMutation } from '@tanstack/react-query';
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { useState } from 'react';
+import { resetPasswordSchema } from './-schema/schema';
+import { z } from 'zod';
+import { BASE_URL } from '@/constants';
+import { toast } from 'sonner';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Header } from '@/components/header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Eye, EyeOff } from 'lucide-react';
 import IconV1 from "@/assets/variant-1.svg?react";
-import type z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
 
-type ZFormValues = z.infer<typeof signupSchema>;
+const resetPasswordSearchSchema = z.object({
+  token: z.string(),
+})
 
-export function Signup() {
+export const Route = createFileRoute('/reset-password/')({
+  validateSearch: resetPasswordSearchSchema,
+  component: ResetPassword,
+});
+
+type ZFormValues = z.infer<typeof resetPasswordSchema>;
+
+function ResetPassword() {
+  const { token } = Route.useSearch();
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState<'password' | 'text'>('password');
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (signupValues: ZFormValues) => {
-      const result = await fetch(`${BASE_URL}/auth/signup`, {
+      const result = await fetch(`${BASE_URL}/auth/reset-password`, {
         headers: {
           "content-type": "application/json",
         },
         method: "POST",
-        body: JSON.stringify(signupValues),
+        body: JSON.stringify({ ...signupValues, token }),
         credentials: "include",
       });
 
@@ -54,8 +53,7 @@ export function Signup() {
     onSuccess: async () => {
       await router.invalidate();
       await router.navigate({
-        to: "/verify-email",
-        search: { email: form.getValues().email }
+        to: "/login",
       });
     },
     onError: (error) => {
@@ -64,10 +62,9 @@ export function Signup() {
   });
 
   const form = useForm<ZFormValues>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       email: "",
-      name: "",
       password: "",
       confirmPassword: ""
     },
@@ -93,32 +90,11 @@ export function Signup() {
       </Header>
       <Card className="w-[50%] mx-auto mt-[5%]">
         <CardHeader>
-          <CardTitle>Signup</CardTitle>
-          <CardDescription>Signup to create an account</CardDescription>
+          <CardTitle>Reset Password</CardTitle>
+          <CardDescription>Reset the password for your account</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-            <FieldGroup>
-              <Controller
-                name="name"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="name">Name</FieldLabel>
-                    <Input
-                      {...field}
-                      id="name"
-                      aria-invalid={fieldState.invalid}
-                      placeholder="John Doe"
-                      autoComplete="off"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-            </FieldGroup>
             <FieldGroup>
               <Controller
                 name="email"

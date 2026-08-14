@@ -7,26 +7,25 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/types/entities/Note";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { $getRoot, type EditorState } from "lexical";
-import { Check, LoaderPinwheel, Search, Settings } from "lucide-react";
+import { Check, LoaderPinwheel, Search } from "lucide-react";
 import { type ChangeEvent } from "react";
 import { useSyncContext } from "@/context/SyncContext";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { useLocalStorage } from "@/hooks/useLocalStorage.ts";
 import { useGlobalStore } from "@/store/store.tsx";
 import { db } from "@/db/syncNotesDb.ts";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useHandleInternalLinkClick } from "../-hooks/useHandleInternalLinkClick";
-import { NoteSettings } from "./NoteSettings";
-import type { TNoteSettings } from "@/types/local-storage/NoteSettings";
+import Profile from "@/components/Profile";
 
 export function Note() {
   const params = useParams({ from: "/_auth/notes/$noteId" });
 
   const navigate = useNavigate();
+
+  const { open } = useSidebar();
+
+  const { isSyncing } = useSyncContext();
+
+  const openModal = useGlobalStore((state) => state.openModal);
 
   const note = useLiveQuery(async () => {
     const existing = await db.notes.get(params.noteId);
@@ -37,25 +36,6 @@ export function Note() {
       to: '/notes',
     })
   }, [params.noteId]);
-
-  const [noteSettings, setNoteSettings] = useLocalStorage<TNoteSettings>(
-    "note-settings",
-    {
-      showSeconds: false,
-      hourFormat: "24",
-    },
-  );
-
-  function onChangeNoteSettings(event: ChangeEvent<HTMLInputElement>) {
-    const { name, value } = event.currentTarget;
-    setNoteSettings({ ...noteSettings, [name]: value });
-  }
-
-  const openModal = useGlobalStore((state) => state.openModal);
-
-  const { open } = useSidebar();
-
-  const { isSyncing } = useSyncContext();
 
   const updateNoteTitle = useDebouncedCallback(
     async (title: string) => {
@@ -95,17 +75,6 @@ export function Note() {
     updateNoteContent(editorState);
   }
 
-  const handleContainerClick = (e: React.MouseEvent) => {
-    // Don't steal focus from interactive elements or the editor itself
-    const target = e.target as HTMLElement;
-    if (
-      target.closest(
-        'input, button, [role="button"], [role="menuitem"], [contenteditable="true"]',
-      )
-    )
-      return;
-  };
-
   useHandleInternalLinkClick();
 
   const title = note ? note.title : "Untitled";
@@ -116,19 +85,11 @@ export function Note() {
     <div
       className="px-4 pt-2 border rounded h-full w-full"
     >
+      {/* Header */}
       <div className="flex gap-1 items-center justify-between">
         {/* Note header left side */}
-        <div className="flex gap-1 items-center">
-          <Button
-            variant="ghost"
-            className={cn(
-              "flex-0 rounded-lg",
-              open ? "invisible pointer-events-none" : "visible",
-            )}
-            asChild
-          >
-            <SidebarTrigger />
-          </Button>
+        <div className={cn("flex gap-1 items-center", open ? "invisible pointer-events-none" : "visible")}>
+          <SidebarTrigger />
         </div>
         <Button
           variant={"outline"}
@@ -151,19 +112,7 @@ export function Note() {
               </>
             )}
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size={"icon-xs"} className="rounded-lg">
-                <Settings className="size-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="rounded-lg">
-              <NoteSettings
-                noteSettings={noteSettings}
-                onChangeNoteSettings={onChangeNoteSettings}
-              />
-            </PopoverContent>
-          </Popover>
+          <Profile />
         </div>
       </div>
       <div className="relative flex flex-col gap-2 h-full overflow-hidden">
@@ -180,21 +129,11 @@ export function Note() {
   return (
     <div
       className="px-4 pt-2 border rounded h-full w-full"
-      onClick={handleContainerClick}
     >
       <div className="flex gap-1 items-center justify-between">
         {/* Note header left side */}
-        <div className="flex gap-1 items-center">
-          <Button
-            variant="ghost"
-            className={cn(
-              "flex-0 rounded-lg",
-              open ? "invisible pointer-events-none" : "visible",
-            )}
-            asChild
-          >
-            <SidebarTrigger />
-          </Button>
+        <div className={cn("flex gap-1 items-center rounded-xl", open ? "invisible pointer-events-none" : "visible")}>
+          <SidebarTrigger />
         </div>
         <Button
           variant={"outline"}
@@ -217,22 +156,11 @@ export function Note() {
               </>
             )}
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size={"icon-xs"} className="rounded-lg">
-                <Settings className="size-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="rounded-lg">
-              <NoteSettings
-                noteSettings={noteSettings}
-                onChangeNoteSettings={onChangeNoteSettings}
-              />
-            </PopoverContent>
-          </Popover>
+          <Profile />
         </div>
       </div>
       <div className="relative flex flex-col gap-2 h-full overflow-hidden">
+        <label htmlFor="noteTitle" className="sr-only">Note Title:</label>
         <input
           key={`${params.noteId}-${note ? 'new' : 'old'}`}
           name="noteTitle"

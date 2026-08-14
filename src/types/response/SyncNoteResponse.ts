@@ -1,5 +1,5 @@
-import type { Folder } from "../Folder";
-import type { Note } from "../Note";
+import type { Folder } from "../entities/Folder";
+import type { Note } from "../entities/Note";
 
 export interface SyncNoteResponse {
   processedFolderIds: string[];

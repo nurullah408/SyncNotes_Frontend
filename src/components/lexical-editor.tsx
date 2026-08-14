@@ -92,7 +92,20 @@ export function Editor({
       <RichTextPlugin
         contentEditable={<ContentEditable ref={contentEditableRef} className={className} />}
         placeholder={
-          <div onClick={handleOnClick} className={placeholderClassName}>Enter some text...</div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={handleOnClick}
+            className={placeholderClassName}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                contentEditableRef.current?.focus();
+              }
+            }}
+          >
+            Enter some text...
+          </div>
         }
         ErrorBoundary={LexicalErrorBoundary}
       />

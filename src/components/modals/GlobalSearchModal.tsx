@@ -78,8 +78,8 @@ export function GlobalSearchModal({ onClose }: GlobalSearchModalProps) {
                     className="animate-pulse duration-500 w-full h-10"
                   />
                 ))
-              : results?.data?.map((res, i) => (
-                  <SearchResult key={i} {...res} onClose={onClose} />
+              : results?.data?.map((res) => (
+                  <SearchResult key={res.id} {...res} onClose={onClose} />
                 ))}
             {!isLoading && search.length === 0 && (
               <span className="text-center text-muted-foreground">
