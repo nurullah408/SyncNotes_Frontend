@@ -1,6 +1,8 @@
 import { InternalLinkComponent } from "@/routes/_auth/notes/-components/InternalLinkComponent";
 import {
   $applyNodeReplacement,
+  $getRoot,
+  $isElementNode,
   DecoratorNode,
   type DOMConversionMap,
   type DOMConversionOutput,
@@ -13,41 +15,35 @@ import {
 import type { ReactElement } from "react";
 
 type SerializedInternalLinkNode = Spread<
-  { noteId: string, title: string },
+  { noteId: string },
   SerializedLexicalNode
 >;
 
 export class InternalLinkNode extends DecoratorNode<ReactElement> {
   __noteId: string;
-  __title: string;
 
   static getType(): string {
     return "internal-link";
   }
 
   static clone(node: InternalLinkNode): InternalLinkNode {
-    return new InternalLinkNode(node.__noteId, node.__title, node.__key);
+    return new InternalLinkNode(node.__noteId, node.__key);
   }
 
-  constructor(noteId: string, title: string, key?: string) {
+  constructor(noteId: string, key?: string) {
     super(key);
     this.__noteId = noteId;
-    this.__title = title;
   }
 
   get noteId(): string {
     return this.__noteId;
   }
 
-  get title(): string {
-    return this.__title;
-  }
-
   static importJSON(
     serializedInternalLinkNode: SerializedInternalLinkNode,
   ): InternalLinkNode {
     return $applyNodeReplacement(
-      new InternalLinkNode(serializedInternalLinkNode.noteId, serializedInternalLinkNode.title)
+      new InternalLinkNode(serializedInternalLinkNode.noteId),
     );
   }
 
@@ -55,9 +51,8 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
     return {
       ...super.exportJSON(),
       noteId: this.__noteId,
-      title: this.__title,
       type: "internal-link",
-    }
+    };
   }
 
   // DOM Rendering
@@ -81,12 +76,12 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
             conversion: (element: HTMLElement): DOMConversionOutput => {
               const title = element.textContent || "";
               const node = $applyNodeReplacement(
-                new InternalLinkNode(noteId, title)
+                new InternalLinkNode(noteId, title),
               );
               return { node };
             },
             priority: 1,
-          }
+          };
         }
         return null;
       },
@@ -96,22 +91,12 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
   exportDOM(): DOMExportOutput {
     const element = document.createElement("a");
     element.setAttribute("data-note-id", this.__noteId);
-    element.setAttribute("data-title", this.__title);
-    element.textContent = this.__title;
     return { element };
   }
 
-  getTextContent(): string {
-    return this.__title;
-  }
-
-  decorateTextContent(): string {
-    return this.__title;
-  }
-
-  decorate (): ReactElement {
+  decorate(): ReactElement {
     return (
-      <InternalLinkComponent noteId={this.__noteId} title={this.__title} nodeKey={this.__key} />
+      <InternalLinkComponent noteId={this.__noteId} nodeKey={this.__key} />
     );
   }
 
@@ -125,6 +110,31 @@ export class InternalLinkNode extends DecoratorNode<ReactElement> {
   }
 }
 
-export function $createInternalLinkNode(noteId: string, title: string): InternalLinkNode {
-  return new InternalLinkNode(noteId, title);
+export function $createInternalLinkNode(noteId: string): InternalLinkNode {
+  return new InternalLinkNode(noteId);
+}
+
+export function $isInternalLinkNode(node: unknown): node is InternalLinkNode {
+  return node instanceof InternalLinkNode;
+}
+
+export function $getInternalLinkTargetIds(): Set<string> {
+  const targetIds = new Set<string>();
+
+  function visit(node: LexicalNode) {
+    if ($isInternalLinkNode(node)) {
+      targetIds.add(node.__noteId);
+      return;
+    }
+
+    if ($isElementNode(node)) {
+      for (const child of node.getChildren()) {
+        visit(child);
+      }
+    }
+  }
+
+  visit($getRoot());
+
+  return targetIds;
 }

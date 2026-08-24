@@ -1,5 +1,5 @@
 export type ChangeOperation = "create" | "update" | "delete";
-export type ChangeEntityType = "folder" | "note";
+export type ChangeEntityType = "folder" | "note" | "edge";
 
 export type ChangeRecord = {
   id?: number;
