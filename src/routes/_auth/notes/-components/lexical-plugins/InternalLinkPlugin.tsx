@@ -2,14 +2,22 @@ import { db } from "@/db/syncNotesDb";
 import { InternalLinkOption } from "@/lib/lexical/classes/InternalLinkOption";
 import { $createInternalLinkNode } from "@/lib/lexical/nodes/InternalLinkNode";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { LexicalTypeaheadMenuPlugin, useBasicTypeaheadTriggerMatch } from "@lexical/react/LexicalTypeaheadMenuPlugin";
+import {
+  LexicalTypeaheadMenuPlugin,
+  useBasicTypeaheadTriggerMatch,
+} from "@lexical/react/LexicalTypeaheadMenuPlugin";
 import { useLiveQuery } from "dexie-react-hooks";
-import { $createTextNode, type TextNode } from "lexical";
+import {
+  $createTextNode,
+  $getNodeByKey,
+  $isTextNode,
+  type TextNode,
+} from "lexical";
 import { FileText } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-export function InternalLinkPlugin() {
+export function InternalLinkPlugin({ nodeId = "" }: { nodeId: string }) {
   const [editor] = useLexicalComposerContext();
   const [queryString, setQueryString] = useState<string | null>("");
 
@@ -18,33 +26,50 @@ export function InternalLinkPlugin() {
   });
 
   const allNotes = useLiveQuery(async () => {
-    return db.notes.filter((n) => !n.isDeleted).toArray()
-  }, []);
+    return db.notes.filter((n) => !n.isDeleted && n.id !== nodeId).toArray();
+  }, [nodeId]);
+
+  const addEdge = async (currentNoteId: string, option: InternalLinkOption) => {
+    const { noteId } = option;
+    const existing = await db.nodeEdges
+      .where("[sourceId+targetId]")
+      .equals([currentNoteId, noteId])
+      .first();
+    if (existing) return;
+    await db.nodeEdges.add({
+      id: crypto.randomUUID(),
+      sourceId: currentNoteId,
+      targetId: noteId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+      isDeleted: false,
+    });
+  };
 
   const options = useMemo(() => {
     if (!allNotes) return [];
 
     const q = (queryString ?? "").toLowerCase().trim();
     if (!q) {
-      return [
-      ...allNotes
-    ].toSorted(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    ).slice(
-      0, 8
-      ).map((n) => new InternalLinkOption(n.id, n.title))
-    };
+      return [...allNotes]
+        .toSorted(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )
+        .slice(0, 8)
+        .map((n) => new InternalLinkOption(n.id, n.title));
+    }
 
     const matches: InternalLinkOption[] = [];
 
     for (const n of allNotes) {
       if (n.title.toLowerCase().includes(q)) {
-        matches.push(new InternalLinkOption(n.id, n.title || "Untitled"));
+        matches.push(new InternalLinkOption(n.id, n.title));
       }
     }
 
     return matches;
-
   }, [allNotes, queryString]);
 
   const onSelectOption = useCallback(
@@ -54,36 +79,60 @@ export function InternalLinkPlugin() {
       closeMenu: () => void,
       matchingString: string,
     ) => {
+      const nodeKey = textNodeContainingQuery?.getKey();
+
+      let inserted = false;
+
       editor.update(() => {
-        if (!textNodeContainingQuery) {
+        if (!nodeKey) {
           closeMenu();
           return;
         }
-        const fullText = textNodeContainingQuery.getTextContent();
+        const node = $getNodeByKey(nodeKey);
+
+        if (!$isTextNode(node)) {
+          closeMenu();
+          return;
+        }
+
+        const fullText = node.getTextContent();
         const marker = "[" + matchingString;
         const start = fullText.indexOf(marker);
+
         if (start === -1) {
           closeMenu();
           return;
         }
+
         const end = start + marker.length;
+
         if (end < fullText.length) {
-          textNodeContainingQuery.splitText(end);
+          node.splitText(end);
         }
-        let target = textNodeContainingQuery;
+
+        let target = node;
+
         if (start > 0) {
-          const [, right] = textNodeContainingQuery.splitText(start);
+          const [, right] = node.splitText(start);
           target = right;
         }
-        const internalLinkNode = $createInternalLinkNode(option.noteId, option.title);
+
+        const internalLinkNode = $createInternalLinkNode(option.noteId);
+
         target.replace(internalLinkNode);
         const space = $createTextNode(" ");
         internalLinkNode.insertAfter(space);
         space.select(1, 1);
+        inserted = true;
         closeMenu();
-      })
+      });
+
+      if (inserted) {
+        addEdge(nodeId, option);
+        inserted = false;
+      }
     },
-    [editor]
+    [editor],
   );
 
   return (
@@ -95,8 +144,9 @@ export function InternalLinkPlugin() {
 
       menuRenderFn={(
         anchorElementRef,
-        { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }
+        { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex },
       ) => {
+        console.log("OPTIONS: ", options);
         if (!anchorElementRef.current || options.length === 0) return null;
         return (
           <InternalLinkMenu
@@ -106,10 +156,10 @@ export function InternalLinkPlugin() {
             setHighlightedIndex={setHighlightedIndex}
             selectOptionAndCleanUp={selectOptionAndCleanUp}
           />
-        )
+        );
       }}
     />
-  )
+  );
 }
 
 type InternalLinkMenuProps = {
@@ -118,7 +168,7 @@ type InternalLinkMenuProps = {
   selectedIndex: number | null;
   setHighlightedIndex: (index: number) => void;
   selectOptionAndCleanUp: (option: InternalLinkOption) => void;
-}
+};
 
 function InternalLinkMenu({
   anchorElement,
@@ -138,7 +188,7 @@ function InternalLinkMenu({
       setCoords({
         top: top + window.scrollY + 10,
         left: left + window.scrollX,
-        ready: true
+        ready: true,
       });
     };
 
@@ -149,7 +199,7 @@ function InternalLinkMenu({
     observer.observe(anchorElement, {
       attributes: true,
       childList: true,
-      subtree: true
+      subtree: true,
     });
 
     return () => {
@@ -179,28 +229,26 @@ function InternalLinkMenu({
       }}
     >
       <ul>
-      {options.map((option, index) => {
-        const isSelected = selectedIndex === index;
-        return (
-          <li
-            role="option"
-            aria-selected={isSelected}
-            key={option.noteId}
-            ref={option.setRefElement}
-            onMouseEnter={() => setHighlightedIndex(index)}
-            onClick={() => selectOptionAndCleanUp(option)}
-            className={
-              `flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`
-            }
-          >
-            <FileText className="size-4" />
-            <span>{option.title || "Untitled"}</span>
-          </li>
-        );
+        {options.map((option, index) => {
+          const isSelected = selectedIndex === index;
+          return (
+            <li
+              role="option"
+              aria-selected={isSelected}
+              key={option.noteId}
+              ref={option.setRefElement}
+              onMouseEnter={() => setHighlightedIndex(index)}
+              onClick={() => selectOptionAndCleanUp(option)}
+              className={`flex items-center gap-2 cursor-pointer rounded-xl px-3 py-2 ${isSelected ? "bg-accent font-medium" : ""}`}
+            >
+              <FileText className="size-4" />
+              <span>{option.title || "Untitled"}</span>
+            </li>
+          );
         })}
       </ul>
-      {options.length === 0 && (
-        <div>No notes found</div>
-      )}
-    </div>, document.body)
+      {options.length === 0 && <div>No notes found</div>}
+    </div>,
+    document.body,
+  );
 }

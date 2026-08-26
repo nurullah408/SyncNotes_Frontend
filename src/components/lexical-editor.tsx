@@ -29,8 +29,10 @@ import { SlashMenuPlugin } from "@/routes/_auth/notes/-components/lexical-plugin
 import { useRef, type MouseEvent } from "react";
 import { InternalLinkNode } from "@/lib/lexical/nodes/InternalLinkNode";
 import { InternalLinkPlugin } from "@/routes/_auth/notes/-components/lexical-plugins/InternalLinkPlugin";
+import { InternalLinkSyncPlugin } from "@/routes/_auth/notes/-components/lexical-plugins/InternalLinkSyncPlugin";
 
 interface EditorProps {
+  currentNodeId: string;
   initialContent: string;
   onChange: (editorState: EditorState) => void;
   namespace?: string;
@@ -47,6 +49,7 @@ function onError(error: Error): void {
 }
 
 export function Editor({
+  currentNodeId,
   initialContent,
   namespace,
   onChange,
@@ -90,7 +93,9 @@ export function Editor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <RichTextPlugin
-        contentEditable={<ContentEditable ref={contentEditableRef} className={className} />}
+        contentEditable={
+          <ContentEditable ref={contentEditableRef} className={className} />
+        }
         placeholder={
           <div
             role="button"
@@ -117,7 +122,8 @@ export function Editor({
       <AutoFocusPlugin />
       <MarkdownShortcutPlugin transformers={CUSTOM_MARKDOWN_TRANSFORMERS} />
       <SlashMenuPlugin />
-      <InternalLinkPlugin />
+      <InternalLinkPlugin nodeId={currentNodeId} />
+      <InternalLinkSyncPlugin noteId={currentNodeId} />
       {children}
     </LexicalComposer>
   );

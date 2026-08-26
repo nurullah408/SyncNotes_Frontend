@@ -1,5 +1,6 @@
 import type { ChangeEntityType, ChangeRecord } from "@/types/entities/ChangeRecord";
 import type { Folder } from "@/types/entities/Folder";
+import type { INodeEdge } from "@/types/entities/INodeEdge";
 import type { Note } from "@/types/entities/Note";
 import Dexie, {
   type Table,
@@ -47,12 +48,13 @@ function createChangeTrackerMiddleware(): Middleware<DBCore> {
           const downTable = downDatabase.table(tableName);
 
           // Only instrument the tables we care about
-          if (tableName !== "notes" && tableName !== "folders") {
+          if (tableName !== "notes" && tableName !== "folders" && tableName !== "nodeEdges") {
             return downTable;
           }
 
           const entityType: ChangeEntityType =
-            tableName === "notes" ? "note" : "folder";
+            tableName === "folders" ? "folder"
+              : tableName === "nodeEdges" ? "edge" : "note";
 
           return {
             ...downTable,
@@ -191,6 +193,7 @@ class SyncNotesDb extends Dexie {
   notes!: Table<Note, string>;
   folders!: Table<Folder, string>;
   changeRecords!: Table<ChangeRecord, number>;
+  nodeEdges!: Table<INodeEdge, string>;
 
   constructor() {
     super("SyncNotesDb");
@@ -201,6 +204,10 @@ class SyncNotesDb extends Dexie {
       changeRecords:
         "id++, changeEntityType, entityId, changeOperation, timestamp, synced",
     });
+
+    this.version(2).stores({
+      nodeEdges: "id, sourceId, targetId, [sourceId+targetId]"
+    })
 
     // Register DBCore middleware – no need to wait for "ready" event.
     // Middleware is active immediately once the database is opened.

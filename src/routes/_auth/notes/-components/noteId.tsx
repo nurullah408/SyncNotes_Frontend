@@ -178,6 +178,7 @@ export function Note() {
         </h3>
         <div className="h-[80%] rounded-lg overflow-y-auto">
           <Editor
+            currentNodeId={params.noteId}
             className="px-1 w-full focus:outline-none"
             placeholderClassName="absolute top-22 left-1 text-gray-400"
             initialContent={content}
